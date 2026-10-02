@@ -12,6 +12,8 @@
 - жодна перевірка не покладається на те, що хтось прибрав за собою раніше.
 """
 
+# ruff: noqa: E402 — харнес підключається до сайту, а вже потім імпортує модулі
+# застосунку: інакше їх нема де взяти. Для цього файла правило вимкнене цілком.
 import sys
 import warnings
 from datetime import date
@@ -46,8 +48,8 @@ BEFORE = {
 apps = frappe.get_installed_apps()
 chk("застосунок ua_compliance встановлено", "ua_compliance" in apps, str(apps))
 
-from ua_compliance import api  # noqa: E402
-from ua_compliance.rates import job, parse, source, writer  # noqa: E402
+from ua_compliance import api
+from ua_compliance.rates import job, parse, source, writer
 
 doctypes = frappe.get_all("DocType", filters={"module": "UA Compliance"}, fields=["name", "custom"])
 chk(
@@ -301,10 +303,10 @@ chk(
 import sys as _sys
 
 _sys.path.insert(0, frappe.get_app_path("ua_compliance", ".."))
-from tests.fixtures.build_package import PARAMETERS_CSV, build_package, generate_key  # noqa: E402
+from tests.fixtures.build_package import PARAMETERS_CSV, build_package, generate_key
 
-from ua_compliance.packages import keys as keys_module  # noqa: E402
-from ua_compliance.ua_compliance.doctype.ua_update_package.ua_update_package import receive  # noqa: E402
+from ua_compliance.packages import keys as keys_module
+from ua_compliance.ua_compliance.doctype.ua_update_package.ua_update_package import receive
 
 key_a, private_a, id_a = generate_key()
 key_b, private_b, id_b = generate_key()
