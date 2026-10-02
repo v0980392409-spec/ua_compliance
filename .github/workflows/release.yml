@@ -1,0 +1,82 @@
+name: Release
+
+# Реліз у два кроки, щоб секретні ключі не потрапляли в CI:
+#   1. підписаний тег v* → перевірки, релізний маніфест і ЧЕРНЕТКА релізу;
+#   2. мейнтейнер підписує маніфест двома ключами офлайн, прикладає .minisig до
+#      чернетки й запускає цей workflow вручну з тегом → перевірка 2 з 3 → публікація.
+# Опублікований реліз незмінний (налаштування репозиторію «Immutable releases»).
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Тег релізу, чернетку якого підписано (наприклад, v0.1.0)"
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  draft:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+      - name: Install tools
+        run: pip install ruff pytest requests cryptography
+      - name: Checks
+        run: ruff check . && python -m compileall -q ua_compliance tests tools && pytest -q
+      - name: Tag is annotated and signed
+        # Підпис тега перевіряє GitHub; легкий тег (без об'єкта тега) не приймається.
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          sha=$(git rev-parse "refs/tags/${GITHUB_REF_NAME}")
+          [ "$(git cat-file -t "$sha")" = "tag" ] || { echo "Тег ${GITHUB_REF_NAME} не анотований"; exit 1; }
+          verified=$(gh api "repos/${GITHUB_REPOSITORY}/git/tags/${sha}" --jq .verification.verified)
+          [ "$verified" = "true" ] || { echo "Підпис тега ${GITHUB_REF_NAME} не перевірено GitHub"; exit 1; }
+      - name: Release manifest
+        run: python tools/release_manifest.py build "${GITHUB_REF_NAME}" > release-manifest.json
+      - name: Draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${GITHUB_REF_NAME}" release-manifest.json --draft --verify-tag \
+            --title "${GITHUB_REF_NAME}" \
+            --notes "Чернетка. Підпишіть release-manifest.json двома ключами й запустіть Release вручну з тегом ${GITHUB_REF_NAME}."
+
+  publish:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+      - name: Install tools
+        run: pip install cryptography
+      - name: Signatures 2 of 3
+        # Ключі беруться з коду на коміті тега, а не з main: інакше реліз можна було б
+        # «підписати» ключем, доданим пізніше.
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag }}
+        run: |
+          git checkout --detach "refs/tags/${TAG}"
+          mkdir signed
+          gh release download "${TAG}" --dir signed --pattern 'release-manifest.json*'
+          python tools/release_manifest.py verify "${TAG}" signed
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag }}
+        run: gh release edit "${TAG}" --draft=false --latest

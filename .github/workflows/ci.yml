@@ -19,6 +19,6 @@ jobs:
       - name: Lint
         run: ruff check .
       - name: Compile
-        run: python -m compileall -q ua_compliance tests
+        run: python -m compileall -q ua_compliance tests tools
       - name: Unit tests
         run: pytest -q

@@ -15,6 +15,7 @@
   "col_head",
   "expires_on",
   "min_app_version",
+  "source_url",
   "manifest_hash",
   "sec_sign",
   "signatures_ok",
@@ -80,6 +81,14 @@
    "fieldname": "min_app_version",
    "fieldtype": "Data",
    "label": "\u041c\u0456\u043d\u0456\u043c\u0430\u043b\u044c\u043d\u0430 \u0432\u0435\u0440\u0441\u0456\u044f \u0437\u0430\u0441\u0442\u043e\u0441\u0443\u043d\u043a\u0443"
+  },
+  {
+   "fieldname": "source_url",
+   "fieldtype": "Data",
+   "label": "\u0417\u0432\u0456\u0434\u043a\u0438 \u043e\u0442\u0440\u0438\u043c\u0430\u043d\u043e",
+   "options": "URL",
+   "read_only": 1,
+   "description": "\u0410\u0434\u0440\u0435\u0441\u0430 \u043f\u0430\u043a\u0435\u0442\u0430 \u0432 \u043a\u0430\u043d\u0430\u043b\u0456 \u0440\u043e\u0437\u0434\u0430\u0447\u0456; \u043f\u043e\u0440\u043e\u0436\u043d\u044c\u043e \u2014 \u043f\u0430\u043a\u0435\u0442 \u043f\u0440\u0438\u043a\u0440\u0456\u043f\u043b\u0435\u043d\u043e \u0432\u0440\u0443\u0447\u043d\u0443"
   },
   {
    "fieldname": "manifest_hash",
@@ -175,7 +184,7 @@
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-10-02 22:56:45.805157",
+ "modified": "2026-10-02 23:31:22.000000",
  "modified_by": "Administrator",
  "module": "UA Compliance",
  "name": "UA Update Package",

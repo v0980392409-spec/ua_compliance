@@ -495,6 +495,110 @@ try:
 		any("Строк придатності" in w for w in (warnings or [])),
 		"; ".join(warnings or [])[:120],
 	)
+
+	# 9.7 Забір з каналу роздачі (FR-039): канал підмінено, решта шляху — справжня
+	from ua_compliance.packages import feed as feed_module
+	from ua_compliance.packages.jobs import poll_packages
+
+	feed_good = build_package(
+		PARAMETERS_CSV.replace("TEST_PKG_MIN_WAGE", "TEST_PKG_FEED"), keys=SIGNERS, version=20261020
+	)
+	feed_bad = build_package(
+		PARAMETERS_CSV.replace("TEST_PKG_MIN_WAGE", "TEST_PKG_FEED_BAD"), keys=SIGNERS[:1], version=20261021
+	)
+	feed_files = {"https://feed.test/20261021/bad.zip": feed_bad, "https://feed.test/20261020/good.zip": feed_good}
+	feed_releases = [
+		{"tag_name": f"parameters-{v}", "published_at": f"2026-10-{d}T08:00:00Z", "draft": False, "prerelease": False,
+		 "assets": [{"name": n, "browser_download_url": f"https://feed.test/{v}/{n}", "size": 1}]}
+		for v, d, n in (("20261021", "21", "bad.zip"), ("20261020", "20", "good.zip"))
+	]
+	_fetch, _download = feed_module.fetch_releases, feed_module.download
+	settings = frappe.get_single("UA Compliance Settings")
+	_feed_url = settings.packages_feed_url
+	try:
+		settings.db_set("packages_feed_url", "https://feed.test/releases")
+		feed_module.fetch_releases = lambda url: feed_releases
+		feed_module.download = lambda asset: feed_files[asset["url"]]
+		polled = poll_packages()
+		stored = {
+			row.source_url: row
+			for row in frappe.get_all(
+				"UA Update Package",
+				filters={"source_url": ["like", "https://feed.test/%"]},
+				fields=["name", "state", "source_url", "reject_reason", "applied_on"],
+			)
+		}
+		good_row = stored.get("https://feed.test/20261020/good.zip")
+		bad_row = stored.get("https://feed.test/20261021/bad.zip")
+		chk(
+			"забраний пакет перевірено й поставлено на рішення, а не застосовано (FR-039)",
+			good_row is not None and good_row.state == "До застосування" and not good_row.applied_on
+			and not frappe.db.exists("UA Legal Parameter", {"code": "TEST_PKG_FEED"}),
+			f"{good_row}",
+		)
+		chk(
+			"пакет з одним підписом із каналу відхилено з причиною",
+			bad_row is not None and bad_row.state == "Відхилено" and "підписів 1" in (bad_row.reject_reason or ""),
+			f"{bad_row}",
+		)
+		attached = frappe.get_all(
+			"File", filters={"attached_to_doctype": "UA Update Package", "attached_to_name": good_row.name}, pluck="name"
+		) if good_row else []
+		chk(
+			"забраний пакет лежить вкладенням — далі той самий шлях, що й файлом (FR-036)",
+			len(attached) == 1 and api._package_bytes(frappe.get_doc("UA Update Package", good_row.name)) == feed_good,
+			f"вкладень {len(attached)}",
+		)
+		repeat = poll_packages()
+		chk(
+			"повторний забір нічого не дублює",
+			len(polled) == 2 and repeat == []
+			and frappe.db.count("UA Update Package", {"source_url": ["like", "https://feed.test/%"]}) == 2,
+			f"перший {len(polled)}, другий {len(repeat)}",
+		)
+
+		def broken(url):
+			raise feed_module.FeedError("Канал роздачі відповів 503")
+
+		feed_module.fetch_releases = broken
+		log_before = frappe.db.count("UA Operation Log", {"message": "Канал роздачі відповів 503"})
+		poll_packages()
+		chk(
+			"недоступний канал лишає запис у журналі, а не мовчить",
+			frappe.db.count("UA Operation Log", {"message": "Канал роздачі відповів 503", "result": "Помилка"})
+			== log_before + 1,
+		)
+	finally:
+		feed_module.fetch_releases, feed_module.download = _fetch, _download
+		settings.db_set("packages_feed_url", _feed_url)
+	chk(
+		"адресу каналу повернуто, як було",
+		frappe.db.get_single_value("UA Compliance Settings", "packages_feed_url") == _feed_url,
+	)
+
+	# 9.8 Ручне заведення з форми: людина обирає лише канал
+	manual = build_package(
+		PARAMETERS_CSV.replace("TEST_PKG_MIN_WAGE", "TEST_PKG_MANUAL"), keys=SIGNERS, version=20261022
+	)
+	results_manual = {}
+	for title in ("Параметри", "Класифікатори"):
+		doc = frappe.get_doc({"doctype": "UA Update Package", "channel": title, "version": "20261022", "state": "Отримано"})
+		doc.insert(ignore_permissions=True)
+		doc.run_verification(manual)
+		results_manual[title] = frappe.db.get_value(
+			"UA Update Package", doc.name, ["channel_code", "state", "reject_reason"], as_dict=True
+		)
+	chk(
+		"пакет із форми отримує код каналу з обраного каналу і проходить перевірку",
+		results_manual["Параметри"].channel_code == "parameters" and results_manual["Параметри"].state == "До застосування",
+		str(results_manual["Параметри"]),
+	)
+	chk(
+		"пакет параметрів, заведений на канал класифікаторів, відхилено",
+		results_manual["Класифікатори"].state == "Відхилено"
+		and "канал пакета parameters" in (results_manual["Класифікатори"].reject_reason or ""),
+		str(results_manual["Класифікатори"]),
+	)
 finally:
 	keys_module.TRUSTED_KEYS[:] = _production_keys
 

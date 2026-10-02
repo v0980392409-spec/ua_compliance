@@ -21,6 +21,8 @@ scheduler_events = {
 	"cron": {
 		"0 7 * * *": ["ua_compliance.rates.job.scheduled_load_rates"],
 		"30 17 * * *": ["ua_compliance.rates.job.scheduled_load_rates"],
+		# Раз на добу — забір пакетів з каналу роздачі; до попередження, щоб воно бачило свіже.
+		"0 8 * * *": ["ua_compliance.packages.jobs.poll_packages"],
 		# Раз на добу — попередження про давність оновлень і прострочені пакети.
 		"15 8 * * *": ["ua_compliance.packages.jobs.warn_about_updates"],
 	}

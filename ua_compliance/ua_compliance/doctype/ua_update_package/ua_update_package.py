@@ -29,6 +29,9 @@ FINAL_STATES = ("Застосовано",)
 
 class UAUpdatePackage(Document):
 	def validate(self):
+		# Код каналу — похідний від обраного каналу: у формі людина обирає лише канал.
+		codes = {title: code for code, title in package_parse.CHANNEL_BY_CODE.items()}
+		self.channel_code = codes.get(self.channel)
 		if not self.is_new():
 			previous = self.get_doc_before_save()
 			if previous and previous.state in FINAL_STATES and self.state != previous.state:
@@ -43,11 +46,26 @@ class UAUpdatePackage(Document):
 	def on_trash(self):
 		frappe.throw(_("Пакет оновлень не видаляється — він є слідом рішення"))
 
+	def _verify(self, raw):
+		"""Перевірка за контрактом плюс збіг каналу маніфесту з каналом документа.
+
+		Без збігу захист від відкоту рахував би версію по чужому каналу, а застосування
+		пішло б не тим шляхом: класифікатор розібрали б як параметри.
+		"""
+		result = package_verify.verify(raw, package_verify.last_applied_version(self.channel_code))
+		manifest_channel = result["manifest"].get("channel")
+		if manifest_channel != self.channel_code:
+			raise PackageError(
+				f"Пакет не прийнято: канал пакета {manifest_channel}, а документ заведено "
+				f"на канал {self.channel_code}"
+			)
+		return result
+
 	def run_verification(self, raw):
 		"""Перевірка за контрактом. Будь-яка невдача — стан «Відхилено» з причиною."""
 		started = now_datetime()
 		try:
-			result = package_verify.verify(raw, package_verify.last_applied_version(self.channel_code))
+			result = self._verify(raw)
 		except PackageError as error:
 			self.state = "Відхилено"
 			self.reject_reason = str(error)
@@ -102,7 +120,7 @@ class UAUpdatePackage(Document):
 			)
 
 		started = now_datetime()
-		result = package_verify.verify(raw, package_verify.last_applied_version(self.channel_code))
+		result = self._verify(raw)
 		reference = f"{self.channel} {self.version}"
 		if self.channel_code == "classifiers":
 			summary = package_apply.apply_classifiers(result["rows"], reference)
