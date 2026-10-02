@@ -51,6 +51,15 @@ human approval. Unofficial, community-maintained. Work in progress.
 Так зроблено свідомо: у 2017 році через сервер оновлень українського бухгалтерського ПЗ пройшла
 атака NotPetya, і клієнти встановлювали все, що приходило.
 
+## Подивитися в роботі
+
+Демонстраційні дані (параметри з періодами дії, свята, календар, курс НБУ за два тижні):
+
+```bash
+env/bin/python apps/ua_compliance/demo/seed_demo.py <site>
+env/bin/python apps/ua_compliance/demo/seed_demo.py <site> --clean
+```
+
 ## Розробка
 
 Перевірки, які ганяє CI, запускаються локально:
