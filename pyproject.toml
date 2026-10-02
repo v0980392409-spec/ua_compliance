@@ -27,3 +27,10 @@ ignore = ["E501", "W191", "E101"]
 
 [tool.ruff.format]
 indent-style = "tab"
+
+[tool.pytest.ini_options]
+# Корінь репозиторію в sys.path — інакше `from ua_compliance...` не імпортується.
+pythonpath = ["."]
+# Збираємо лише власні тести: заготовки тестів доктайпів вимагають платформи
+# і запускаються на стенді (`bench run-tests --app ua_compliance`), а не в CI.
+testpaths = ["tests"]
