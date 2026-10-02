@@ -51,6 +51,21 @@ human approval. Unofficial, community-maintained. Work in progress.
 Так зроблено свідомо: у 2017 році через сервер оновлень українського бухгалтерського ПЗ пройшла
 атака NotPetya, і клієнти встановлювали все, що приходило.
 
+## Розробка
+
+Перевірки, які ганяє CI, запускаються локально:
+
+```bash
+python3 -m venv .venv && .venv/bin/pip install ruff pytest requests cryptography
+.venv/bin/ruff check . && .venv/bin/pytest -q
+```
+
+Повна перевірка на живому сайті (створює документи в пісочниці й прибирає за собою):
+
+```bash
+env/bin/python apps/ua_compliance/verify-all.py <site>
+```
+
 ## Ліцензія
 
 GPL-3.0-or-later.

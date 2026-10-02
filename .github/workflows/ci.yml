@@ -14,7 +14,8 @@ jobs:
         with:
           python-version: "3.x"
       - name: Install tools
-        run: pip install ruff pytest requests
+        # cryptography і requests на стенді дає платформа, у CI їх треба поставити явно.
+        run: pip install ruff pytest requests cryptography
       - name: Lint
         run: ruff check .
       - name: Compile
