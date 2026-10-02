@@ -9,6 +9,7 @@ required_apps = ["frappe"]
 # Налаштування, які живуть у базі, але мають приїжджати із застосунком.
 fixtures = [
 	{"dt": "Custom Field", "filters": [["fieldname", "like", "ua\\_%"]]},
+	{"dt": "Role", "filters": [["name", "in", ["Відповідальний за законодавство"]]]},
 ]
 
 after_install = "ua_compliance.setup.install.after_install"

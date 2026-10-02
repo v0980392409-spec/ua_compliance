@@ -38,7 +38,7 @@ def chk(name, ok, note=""):
 # Знімок того, що існувало ДО прогону.
 BEFORE = {
 	dt: set(frappe.get_all(dt, pluck="name"))
-	for dt in ("Currency Exchange", "UA Operation Log")
+	for dt in ("Currency Exchange", "UA Operation Log", "UA Legal Parameter")
 	if frappe.db.exists("DocType", dt)
 }
 
@@ -192,12 +192,119 @@ chk(
 	f"звірено {checked} значень, розбіжностей {mismatch}",
 )
 
-# 8. Прибирання за собою
+# 8. Законодавчий параметр (US2)
+PARAM = "TEST_MIN_WAGE"
+frappe.db.delete("UA Legal Parameter", {"code": PARAM})
+
+
+def make_param(valid_from, value, valid_to=None, source="Введено вручну", code=PARAM):
+	return frappe.get_doc(
+		{
+			"doctype": "UA Legal Parameter",
+			"code": code,
+			"parameter_name": "Мінімальна заробітна плата (перевірка)",
+			"value_type": "Сума",
+			"value_number": value,
+			"unit": "грн",
+			"valid_from": valid_from,
+			"valid_to": valid_to,
+			"basis_type": "Закон",
+			"basis_number": "4695-IX",
+			"basis_date": "2025-12-03",
+			"basis_url": "https://zakon.rada.gov.ua/laws/show/4695-20",
+			"source": source,
+			"verified_on": "2026-10-02",
+		}
+	).insert(ignore_permissions=True)
+
+
+first = make_param("2025-01-01", 8000, valid_to="2025-12-31")
+second = make_param("2026-01-01", 8647)
+chk(
+	"параметр зберігається з періодом і підставою",
+	frappe.db.get_value("UA Legal Parameter", first.name, "value_number") == 8000,
+	first.name,
+)
+chk("значення на дату всередині першого періоду", api.get_parameter(PARAM, date(2025, 6, 15)) == 8000)
+chk("значення на дату всередині другого періоду", api.get_parameter(PARAM, date(2026, 6, 15)) == 8647)
+
+try:
+	api.get_parameter(PARAM, date(2024, 6, 15))
+	chk("на дату без значення — помилка, а не нуль (FR-016)", False, "помилки не було")
+except frappe.ValidationError as error:
+	chk(
+		"на дату без значення — помилка, а не нуль (FR-016)",
+		"не визначено" in str(error),
+		str(error)[:90],
+	)
+
+try:
+	make_param("2026-06-01", 9000)
+	chk("перетин періодів відхиляється (FR-017)", False, "запис створився")
+except frappe.ValidationError as error:
+	chk("перетин періодів відхиляється (FR-017)", "перетинається" in str(error), str(error)[:90])
+
+try:
+	frappe.delete_doc("UA Legal Parameter", first.name, ignore_permissions=True)
+	chk("видалення заборонено (FR-018)", False, "запис видалився")
+except frappe.ValidationError as error:
+	chk("видалення заборонено (FR-018)", "не видаляється" in str(error), str(error)[:90])
+
+try:
+	make_param("2027-01-01", 9546, code="test_bad_code")
+	chk("код лише латиницею великими літерами (принцип III)", False, "запис створився")
+except frappe.ValidationError as error:
+	chk("код лише латиницею великими літерами (принцип III)", "латиницею" in str(error), str(error)[:70])
+
+from_package = make_param("2024-01-01", 7100, valid_to="2024-12-31", source="З пакета", code="TEST_FROM_PACKAGE")
+from_package.value_number = 7777
+try:
+	from_package.save(ignore_permissions=True)
+	chk("запис із пакета не правиться руками", False, "правка пройшла")
+except frappe.ValidationError as error:
+	chk("запис із пакета не правиться руками", "не редагується" in str(error), str(error)[:90])
+
+# SC-011: поява нового значення не змінює розрахунок за минулий період.
+# Так це відбувається в житті: пакет закриває чинний період датою і додає наступний.
+before_change = api.get_parameter(PARAM, date(2025, 6, 15))
+second.valid_to = "2026-12-31"
+second.save(ignore_permissions=True)
+make_param("2027-01-01", 9546, code=PARAM)
+chk("нове значення діє з наступного періоду", api.get_parameter(PARAM, date(2027, 6, 15)) == 9546)
+chk(
+	"розрахунок за минулий період відтворюється після зміни значення (SC-011)",
+	api.get_parameter(PARAM, date(2025, 6, 15)) == before_change == 8000,
+)
+
+# SC-005: значення не продубльоване формулою чи налаштуванням
+duplicates = []
+values = {
+	frappe.utils.flt(v)
+	for v in frappe.get_all("UA Legal Parameter", filters={"value_type": ["in", ["Сума", "Число", "Відсоток"]]}, pluck="value_number")
+	if v
+}
+sources = []
+if frappe.db.exists("DocType", "Salary Component"):
+	sources += [(f"Salary Component {r.name}", r.formula) for r in frappe.get_all("Salary Component", fields=["name", "formula"]) if r.formula]
+sources += [(f"Custom Field {r.name}", r.default) for r in frappe.get_all("Custom Field", fields=["name", "default"]) if r.default]
+for where, text in sources:
+	for value in values:
+		if str(value).rstrip("0").rstrip(".") and str(value).rstrip("0").rstrip(".") in str(text):
+			duplicates.append(f"{where}: {text}")
+chk(
+	"значення параметра не продубльоване формулою чи налаштуванням (SC-005)",
+	not duplicates,
+	"; ".join(duplicates[:3]) if duplicates else f"перевірено значень {len(values)} у {len(sources)} місцях",
+)
+
+# 9. Прибирання за собою
 frappe.db.rollback()
 removed = 0
 for doctype, existing in BEFORE.items():
 	for name in set(frappe.get_all(doctype, pluck="name")) - existing:
-		frappe.delete_doc(doctype, name, force=True, ignore_permissions=True)
+		# Параметр має заборону на видалення — прибираємо напряму, інакше пісочниця
+		# лишається на стенді й наступний прогін падає на перетині періодів.
+		frappe.db.delete(doctype, {"name": name})
 		removed += 1
 frappe.db.commit()
 leftovers = sum(len(set(frappe.get_all(dt, pluck="name")) - existing) for dt, existing in BEFORE.items())
