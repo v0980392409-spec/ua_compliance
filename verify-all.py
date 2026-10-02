@@ -304,7 +304,6 @@ import sys as _sys
 
 _sys.path.insert(0, frappe.get_app_path("ua_compliance", ".."))
 from tests.fixtures.build_package import PARAMETERS_CSV, build_package, generate_key
-
 from ua_compliance.packages import keys as keys_module
 from ua_compliance.ua_compliance.doctype.ua_update_package.ua_update_package import receive
 
