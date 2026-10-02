@@ -21,3 +21,12 @@ msgstr "Налаштування законодавства"
 
 msgid "UA Compliance Currency"
 msgstr "Валюта завантаження"
+
+msgid "UA Legal Parameter"
+msgstr "Законодавчий параметр"
+
+msgid "UA Update Package"
+msgstr "Пакет оновлень"
+
+msgid "Legal parameter"
+msgstr "Законодавчий параметр"
