@@ -58,6 +58,20 @@ def holidays_for_year(year: int):
 	return sorted(result)
 
 
+def merge_same_dates(entries):
+	"""Свята, що збіглися в одну дату, — один рядок з обома назвами.
+
+	Штатний календар не приймає повторну дату, а збіг буває: Великдень 01.05.2016
+	припав на День праці. Перенесення в такому разі не виникає — день один.
+	"""
+	names_by_date = {}
+	for occurrence, name, _off in entries:
+		names = names_by_date.setdefault(occurrence, [])
+		if name not in names:
+			names.append(name)
+	return [(occurrence, "; ".join(names), True) for occurrence, names in sorted(names_by_date.items())]
+
+
 def build_holiday_list(year: int, title=None, confirm_past=False, martial_law_code=MARTIAL_LAW_CODE):
 	"""Збирає штатний календар вихідних на рік. Повертає зведення.
 
@@ -83,7 +97,7 @@ def build_holiday_list(year: int, title=None, confirm_past=False, martial_law_co
 			continue
 		entries.append((occurrence, name, True))
 
-	entries.sort()
+	entries = merge_same_dates(entries)
 	existing = frappe.db.exists("Holiday List", title)
 	if existing:
 		doc = frappe.get_doc("Holiday List", title)

@@ -28,10 +28,17 @@ FINAL_STATES = ("Застосовано",)
 
 
 class UAUpdatePackage(Document):
-	def validate(self):
+	def _set_channel_code(self):
 		# Код каналу — похідний від обраного каналу: у формі людина обирає лише канал.
 		codes = {title: code for code, title in package_parse.CHANNEL_BY_CODE.items()}
 		self.channel_code = codes.get(self.channel)
+
+	def before_insert(self):
+		# Ім'я складається з коду каналу, а присвоюється раніше за validate.
+		self._set_channel_code()
+
+	def validate(self):
+		self._set_channel_code()
 		if not self.is_new():
 			previous = self.get_doc_before_save()
 			if previous and previous.state in FINAL_STATES and self.state != previous.state:

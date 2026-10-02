@@ -513,10 +513,16 @@ try:
 		for v, d, n in (("20261021", "21", "bad.zip"), ("20261020", "20", "good.zip"))
 	]
 	_fetch, _download = feed_module.fetch_releases, feed_module.download
-	settings = frappe.get_single("UA Compliance Settings")
-	_feed_url = settings.packages_feed_url
+	# Налаштування могли жодного разу не зберігатися: тоді рядків у Singles немає й діють
+	# умовчання. Один записаний рядок вимикає умовчання решти полів, тому ставимо обидва
+	# поля явно, а повертаємо точно той набір рядків, що був.
+	SETTINGS = "UA Compliance Settings"
+	singles_query = "select field, value from tabSingles where doctype=%s order by field"
+	_singles = frappe.db.sql(singles_query, SETTINGS)
 	try:
-		settings.db_set("packages_feed_url", "https://feed.test/releases")
+		frappe.db.set_single_value(
+			SETTINGS, {"packages_enabled": 1, "packages_feed_url": "https://feed.test/releases"}
+		)
 		feed_module.fetch_releases = lambda url: feed_releases
 		feed_module.download = lambda asset: feed_files[asset["url"]]
 		polled = poll_packages()
@@ -570,10 +576,14 @@ try:
 		)
 	finally:
 		feed_module.fetch_releases, feed_module.download = _fetch, _download
-		settings.db_set("packages_feed_url", _feed_url)
+		frappe.db.delete("Singles", {"doctype": SETTINGS})
+		for field, value in _singles:
+			frappe.db.sql("insert into tabSingles (doctype, field, value) values (%s, %s, %s)", (SETTINGS, field, value))
+		frappe.clear_document_cache(SETTINGS, SETTINGS)
 	chk(
-		"адресу каналу повернуто, як було",
-		frappe.db.get_single_value("UA Compliance Settings", "packages_feed_url") == _feed_url,
+		"налаштування повернуто точно, як були",
+		frappe.db.sql(singles_query, SETTINGS) == _singles,
+		f"рядків {len(_singles)}",
 	)
 
 	# 9.8 Ручне заведення з форми: людина обирає лише канал
@@ -657,6 +667,8 @@ def make_rule(name, day, month, rule_type="Фіксована дата", valid_f
 flag_war = make_flag("2022-03-15", 1, valid_to="2026-12-31")
 flag_peace = make_flag("2027-01-01", 0)
 rule_new_year = make_rule("Перевірка: Новий рік", 1, 1)
+# Друге свято на ту саму дату: збіг буває (Великдень 01.05.2016 = День праці)
+rule_same_day = make_rule("Перевірка: збіг дат", 1, 1)
 rule_easter = make_rule("Перевірка: Великдень", None, None, rule_type="Великдень")
 
 TITLE_2027 = "Перевірка календаря 2027"
@@ -668,6 +680,17 @@ chk(
 	"після закінчення воєнного стану свята стають вихідними (FR-041)",
 	built["martial_law"] is False and built["holidays"] >= 1,
 	str(built),
+)
+
+new_year_rows = frappe.get_all(
+	"Holiday", filters={"parent": TITLE_2027, "holiday_date": "2027-01-01"}, pluck="description"
+)
+chk(
+	"свята, що збіглися в одну дату, — один рядок з обома назвами",
+	len(new_year_rows) == 1
+	and "Перевірка: Новий рік" in new_year_rows[0]
+	and "Перевірка: збіг дат" in new_year_rows[0],
+	"; ".join(new_year_rows),
 )
 
 again = calendar_build.build_holiday_list(2027, title=TITLE_2027, martial_law_code=MARTIAL_CODE)
