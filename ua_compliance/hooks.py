@@ -7,9 +7,18 @@ app_license = "GPL-3.0-or-later"
 required_apps = ["frappe"]
 
 # Налаштування, які живуть у базі, але мають приїжджати із застосунком.
-# Склад фікстур заповнюється разом з доктайпами (задачі T011, T013).
-fixtures = []
+fixtures = [
+	{"dt": "Custom Field", "filters": [["fieldname", "like", "ua\\_%"]]},
+]
 
-# Розклад завдань: час запусків береться з «Налаштування законодавства»,
-# у коді лишається лише прив'язка (задачі T019, T020, T041).
-scheduler_events = {}
+after_install = "ua_compliance.setup.install.after_install"
+after_migrate = "ua_compliance.setup.install.after_migrate"
+
+# Два запуски на добу: ранковий добирає курс на сьогодні, вечірній забирає курс,
+# встановлений джерелом на завтра (воно встановлює його після 15:30).
+scheduler_events = {
+	"cron": {
+		"0 7 * * *": ["ua_compliance.rates.job.scheduled_load_rates"],
+		"30 17 * * *": ["ua_compliance.rates.job.scheduled_load_rates"],
+	}
+}
