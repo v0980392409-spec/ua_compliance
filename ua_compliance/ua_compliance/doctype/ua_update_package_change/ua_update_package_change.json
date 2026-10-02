@@ -1,0 +1,86 @@
+{
+ "actions": [],
+ "allow_bulk_edit": 1,
+ "allow_rename": 1,
+ "creation": "2026-10-02 22:19:51.640405",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "entity",
+  "code",
+  "action",
+  "valid_from",
+  "old_value",
+  "new_value",
+  "conflict"
+ ],
+ "fields": [
+  {
+   "columns": 2,
+   "fieldname": "entity",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "\u0429\u043e \u0437\u043c\u0456\u043d\u044e\u0454\u0442\u044c\u0441\u044f",
+   "options": "\u041f\u0430\u0440\u0430\u043c\u0435\u0442\u0440\n\u0421\u0432\u044f\u0442\u043e\n\u041a\u043e\u0434 \u043a\u043b\u0430\u0441\u0438\u0444\u0456\u043a\u0430\u0442\u043e\u0440\u0430"
+  },
+  {
+   "columns": 2,
+   "fieldname": "code",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "\u041a\u043e\u0434"
+  },
+  {
+   "columns": 1,
+   "fieldname": "action",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "\u0414\u0456\u044f",
+   "options": "\u0414\u043e\u0434\u0430\u0454\u0442\u044c\u0441\u044f\n\u0417\u0430\u043a\u0440\u0438\u0432\u0430\u0454\u0442\u044c\u0441\u044f\n\u0417\u043c\u0456\u043d\u044e\u0454\u0442\u044c\u0441\u044f"
+  },
+  {
+   "columns": 1,
+   "fieldname": "valid_from",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "label": "\u0414\u0456\u0454 \u0437"
+  },
+  {
+   "columns": 2,
+   "fieldname": "old_value",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "\u0411\u0443\u043b\u043e"
+  },
+  {
+   "columns": 2,
+   "fieldname": "new_value",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "\u0421\u0442\u0430\u043d\u0435"
+  },
+  {
+   "columns": 1,
+   "default": "0",
+   "fieldname": "conflict",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "label": "\u0420\u043e\u0437\u0445\u043e\u0434\u0438\u0442\u044c\u0441\u044f \u0437 \u0440\u0443\u0447\u043d\u0438\u043c \u0437\u0430\u043f\u0438\u0441\u043e\u043c"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "istable": 1,
+ "links": [],
+ "modified": "2026-10-02 22:19:51.640405",
+ "modified_by": "Administrator",
+ "module": "UA Compliance",
+ "name": "UA Update Package Change",
+ "owner": "Administrator",
+ "permissions": [],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": []
+}

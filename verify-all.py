@@ -38,7 +38,7 @@ def chk(name, ok, note=""):
 # Знімок того, що існувало ДО прогону.
 BEFORE = {
 	dt: set(frappe.get_all(dt, pluck="name"))
-	for dt in ("Currency Exchange", "UA Operation Log", "UA Legal Parameter")
+	for dt in ("Currency Exchange", "UA Operation Log", "UA Legal Parameter", "UA Update Package")
 	if frappe.db.exists("DocType", dt)
 }
 
@@ -297,7 +297,197 @@ chk(
 	"; ".join(duplicates[:3]) if duplicates else f"перевірено значень {len(values)} у {len(sources)} місцях",
 )
 
-# 9. Прибирання за собою
+# 9. Пакет оновлень (US3)
+import sys as _sys
+
+_sys.path.insert(0, frappe.get_app_path("ua_compliance", ".."))
+from tests.fixtures.build_package import PARAMETERS_CSV, build_package, generate_key  # noqa: E402
+
+from ua_compliance.packages import keys as keys_module  # noqa: E402
+from ua_compliance.ua_compliance.doctype.ua_update_package.ua_update_package import receive  # noqa: E402
+
+key_a, private_a, id_a = generate_key()
+key_b, private_b, id_b = generate_key()
+key_c, private_c, id_c = generate_key()
+SIGNERS = [(private_a, id_a), (private_b, id_b)]
+_production_keys = list(keys_module.TRUSTED_KEYS)
+keys_module.TRUSTED_KEYS[:] = [key_a, key_b, key_c]  # лише для перевірки: бойові ключі приїжджають релізом
+
+
+def take(raw, version=20261002):
+	package = receive(raw, "parameters", version)
+	ok = package.run_verification(raw)
+	return package, ok
+
+
+try:
+	# 9.1 Повний шлях: прийняття → перевірка → передпоказ → затвердження → застосування
+	good = build_package(PARAMETERS_CSV, keys=SIGNERS, version=20261002)
+	package, ok = take(good)
+	chk(
+		"пакет із двома підписами проходить перевірку",
+		ok and package.state == "До застосування" and package.signatures_ok == 2,
+		f"{package.state}, підписів {package.signatures_ok}",
+	)
+	chk(
+		"передпоказ показує, що саме зміниться (FR-031)",
+		len(package.preview) >= 1 and package.preview[0].action == "Додається",
+		"; ".join(f"{r.action} {r.code} з {r.valid_from}" for r in package.preview),
+	)
+	chk(
+		"до затвердження нічого не застосовано (FR-030)",
+		not frappe.db.exists("UA Legal Parameter", {"code": "TEST_PKG_MIN_WAGE"}),
+	)
+
+	summary = package.approve_and_apply(good)
+	applied = frappe.db.get_value(
+		"UA Legal Parameter",
+		{"code": "TEST_PKG_MIN_WAGE"},
+		["value_number", "source", "source_reference", "basis_number"],
+		as_dict=True,
+	)
+	chk(
+		"після затвердження параметр з'явився з посиланням на пакет",
+		package.state == "Застосовано" and applied and applied.value_number == 9546 and applied.source == "З пакета",
+		str(applied),
+	)
+	chk(
+		"застосування лишило запис у журналі (FR-039)",
+		bool(frappe.get_all("UA Operation Log", filters={"kind": "Застосування пакета", "package": package.name})),
+	)
+
+	package.state = "Відхилено"
+	try:
+		package.save(ignore_permissions=True)
+		chk("застосований пакет не скасовується (FR-035)", False, "стан змінився")
+	except frappe.ValidationError as error:
+		chk("застосований пакет не скасовується (FR-035)", "не скасовується" in str(error), str(error)[:80])
+	package.reload()
+
+	# 9.2 Чотири зіпсованих пакети
+	one_signature = build_package(PARAMETERS_CSV, keys=[SIGNERS[0]], version=20261003)
+	package_one, ok_one = take(one_signature, version=20261003)
+	chk(
+		"один підпис замість двох — відмова (FR-024)",
+		not ok_one and "підписів 1, потрібно 2" in (package_one.reject_reason or ""),
+		package_one.reject_reason,
+	)
+
+	old_version = build_package(PARAMETERS_CSV, keys=SIGNERS, version=20261001)
+	package_old, ok_old = take(old_version, version=20261001)
+	chk(
+		"версія не новіша за застосовану — відмова (FR-025)",
+		not ok_old and "не новіша" in (package_old.reject_reason or ""),
+		package_old.reject_reason,
+	)
+
+	expired = build_package(PARAMETERS_CSV, keys=SIGNERS, version=20261004, expires="2020-01-01")
+	package_expired, ok_expired = take(expired, version=20261004)
+	chk(
+		"строк придатності минув — відмова (FR-026)",
+		not ok_expired and "строк придатності" in (package_expired.reject_reason or ""),
+		package_expired.reject_reason,
+	)
+
+	bad_hash = build_package(PARAMETERS_CSV, keys=SIGNERS, version=20261005, corrupt_hash=True)
+	package_hash, ok_hash = take(bad_hash, version=20261005)
+	chk(
+		"хеш файла не збігається — відмова (FR-027)",
+		not ok_hash and "не відповідає хешу" in (package_hash.reject_reason or ""),
+		package_hash.reject_reason,
+	)
+
+	# 9.3 Виконуваний вміст і стара версія застосунку
+	executable = build_package(
+		PARAMETERS_CSV, keys=SIGNERS, version=20261006, extra_file=("evil.py", b"import os")
+	)
+	package_exec, ok_exec = take(executable, version=20261006)
+	chk(
+		"файл, що не є даними, робить пакет неприйнятним (FR-034)",
+		not ok_exec and "не є файлом даних" in (package_exec.reject_reason or ""),
+		package_exec.reject_reason,
+	)
+
+	too_new = build_package(PARAMETERS_CSV, keys=SIGNERS, version=20261007, min_app_version="99.0.0")
+	package_new, ok_new = take(too_new, version=20261007)
+	chk(
+		"пакет для новішої версії застосунку — відмова (FR-052)",
+		not ok_new and "версія застосунку не нижче" in (package_new.reject_reason or ""),
+		package_new.reject_reason,
+	)
+
+	# 9.4 Розходження з ручним записом
+	make_param("2027-01-01", 9000, code="TEST_PKG_MIN_WAGE_MANUAL")
+	manual_csv = PARAMETERS_CSV.replace("TEST_PKG_MIN_WAGE", "TEST_PKG_MIN_WAGE_MANUAL")
+	conflicting = build_package(manual_csv, keys=SIGNERS, version=20261008)
+	package_conflict, ok_conflict = take(conflicting, version=20261008)
+	conflict_rows = [row for row in package_conflict.preview if row.conflict]
+	chk(
+		"розходження з ручним записом виділено в передпоказі (FR-032)",
+		ok_conflict and bool(conflict_rows),
+		"; ".join(f"{r.code} {r.old_value}→{r.new_value}" for r in conflict_rows),
+	)
+	try:
+		package_conflict.approve_and_apply(conflicting)
+		chk("пакет із розходженням не застосовується без рішення (FR-032)", False, "застосувався")
+	except frappe.ValidationError as error:
+		chk(
+			"пакет із розходженням не застосовується без рішення (FR-032)",
+			"розходження" in str(error),
+			str(error)[:90],
+		)
+	# 9.5 Той самий пакет файлом (ізольований контур) і кнопки форми
+	offline = build_package(
+		PARAMETERS_CSV.replace("TEST_PKG_MIN_WAGE", "TEST_PKG_OFFLINE"), keys=SIGNERS, version=20261009
+	)
+	package_offline = receive(offline, "parameters", 20261009)
+	attachment = frappe.get_doc(
+		{
+			"doctype": "File",
+			"file_name": "ua-params-offline.zip",
+			"attached_to_doctype": "UA Update Package",
+			"attached_to_name": package_offline.name,
+			"content": offline,
+			"is_private": 1,
+			"decode": False,
+		}
+	).insert(ignore_permissions=True)
+	result_offline = api.verify_package(package_offline.name)
+	chk(
+		"пакет, прикріплений файлом, перевіряється тим самим шляхом (FR-036)",
+		result_offline["ok"] and result_offline["state"] == "До застосування",
+		f"{result_offline}, файл {attachment.file_name}",
+	)
+
+	applied_offline = api.approve_package(package_offline.name)
+	chk(
+		"кнопка «Затвердити» застосовує пакет (FR-030)",
+		applied_offline["state"] == "Застосовано" and applied_offline["created"] >= 1,
+		str(applied_offline),
+	)
+
+	# 9.6 Попередження про прострочений пакет (FR-038)
+	stale = build_package(
+		PARAMETERS_CSV.replace("TEST_PKG_MIN_WAGE", "TEST_PKG_STALE"), keys=SIGNERS, version=20261010
+	)
+	package_stale = receive(stale, "parameters", 20261010)
+	package_stale.state = "До застосування"
+	package_stale.expires_on = "2020-01-01"
+	package_stale.save(ignore_permissions=True)
+	from ua_compliance.packages.jobs import warn_about_updates
+
+	warnings = warn_about_updates()
+	chk(
+		"попередження про прострочений пакет потрапляє в журнал (FR-038)",
+		any("Строк придатності" in w for w in (warnings or [])),
+		"; ".join(warnings or [])[:120],
+	)
+finally:
+	keys_module.TRUSTED_KEYS[:] = _production_keys
+
+chk("бойові ключі не лишилися підміненими перевіркою", keys_module.TRUSTED_KEYS == _production_keys)
+
+# 10. Прибирання за собою
 frappe.db.rollback()
 removed = 0
 for doctype, existing in BEFORE.items():

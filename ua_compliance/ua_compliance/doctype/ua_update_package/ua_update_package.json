@@ -1,0 +1,217 @@
+{
+ "actions": [],
+ "allow_bulk_edit": 1,
+ "allow_rename": 1,
+ "autoname": "format:UA-PKG-{channel_code}-{version}",
+ "creation": "2026-10-02 22:19:51.742271",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "channel",
+  "channel_code",
+  "version",
+  "state",
+  "col_head",
+  "expires_on",
+  "min_app_version",
+  "manifest_hash",
+  "sec_sign",
+  "signatures_ok",
+  "key_ids",
+  "col_sign",
+  "notes",
+  "sec_files",
+  "files",
+  "sec_preview",
+  "preview",
+  "sec_result",
+  "reject_reason",
+  "approved_by",
+  "col_result",
+  "approved_on",
+  "applied_on"
+ ],
+ "fields": [
+  {
+   "fieldname": "channel",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "\u041a\u0430\u043d\u0430\u043b",
+   "options": "\u041f\u0430\u0440\u0430\u043c\u0435\u0442\u0440\u0438\n\u041a\u0430\u043b\u0435\u043d\u0434\u0430\u0440\n\u041a\u043b\u0430\u0441\u0438\u0444\u0456\u043a\u0430\u0442\u043e\u0440\u0438",
+   "reqd": 1
+  },
+  {
+   "fieldname": "channel_code",
+   "fieldtype": "Data",
+   "hidden": 1,
+   "label": "\u041a\u043e\u0434 \u043a\u0430\u043d\u0430\u043b\u0443",
+   "read_only": 1
+  },
+  {
+   "fieldname": "version",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "\u0412\u0435\u0440\u0441\u0456\u044f",
+   "reqd": 1
+  },
+  {
+   "default": "\u041e\u0442\u0440\u0438\u043c\u0430\u043d\u043e",
+   "fieldname": "state",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "\u0421\u0442\u0430\u043d",
+   "options": "\u041e\u0442\u0440\u0438\u043c\u0430\u043d\u043e\n\u041f\u0435\u0440\u0435\u0432\u0456\u0440\u0435\u043d\u043e\n\u0414\u043e \u0437\u0430\u0441\u0442\u043e\u0441\u0443\u0432\u0430\u043d\u043d\u044f\n\u0417\u0430\u0442\u0432\u0435\u0440\u0434\u0436\u0435\u043d\u043e\n\u0417\u0430\u0441\u0442\u043e\u0441\u043e\u0432\u0430\u043d\u043e\n\u0412\u0456\u0434\u0445\u0438\u043b\u0435\u043d\u043e",
+   "reqd": 1
+  },
+  {
+   "fieldname": "col_head",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "expires_on",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "label": "\u0421\u0442\u0440\u043e\u043a \u043f\u0440\u0438\u0434\u0430\u0442\u043d\u043e\u0441\u0442\u0456"
+  },
+  {
+   "fieldname": "min_app_version",
+   "fieldtype": "Data",
+   "label": "\u041c\u0456\u043d\u0456\u043c\u0430\u043b\u044c\u043d\u0430 \u0432\u0435\u0440\u0441\u0456\u044f \u0437\u0430\u0441\u0442\u043e\u0441\u0443\u043d\u043a\u0443"
+  },
+  {
+   "fieldname": "manifest_hash",
+   "fieldtype": "Data",
+   "label": "\u0425\u0435\u0448 \u043c\u0430\u043d\u0456\u0444\u0435\u0441\u0442\u0443",
+   "read_only": 1
+  },
+  {
+   "fieldname": "sec_sign",
+   "fieldtype": "Section Break",
+   "label": "\u041f\u0456\u0434\u043f\u0438\u0441\u0438"
+  },
+  {
+   "fieldname": "signatures_ok",
+   "fieldtype": "Int",
+   "label": "\u0414\u0456\u0439\u0441\u043d\u0438\u0445 \u043f\u0456\u0434\u043f\u0438\u0441\u0456\u0432",
+   "read_only": 1
+  },
+  {
+   "fieldname": "key_ids",
+   "fieldtype": "Small Text",
+   "label": "\u041a\u043b\u044e\u0447\u0456 \u043f\u0456\u0434\u043f\u0438\u0441\u0443",
+   "read_only": 1
+  },
+  {
+   "fieldname": "col_sign",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "notes",
+   "fieldtype": "Small Text",
+   "label": "\u0429\u043e \u0432 \u043f\u0430\u043a\u0435\u0442\u0456",
+   "read_only": 1
+  },
+  {
+   "fieldname": "sec_files",
+   "fieldtype": "Section Break",
+   "label": "\u0424\u0430\u0439\u043b\u0438"
+  },
+  {
+   "fieldname": "files",
+   "fieldtype": "Table",
+   "label": "\u0424\u0430\u0439\u043b\u0438",
+   "options": "UA Update Package File"
+  },
+  {
+   "fieldname": "sec_preview",
+   "fieldtype": "Section Break",
+   "label": "\u0429\u043e \u0437\u043c\u0456\u043d\u0438\u0442\u044c\u0441\u044f"
+  },
+  {
+   "fieldname": "preview",
+   "fieldtype": "Table",
+   "label": "\u0417\u043c\u0456\u043d\u0438",
+   "options": "UA Update Package Change",
+   "read_only": 1
+  },
+  {
+   "fieldname": "sec_result",
+   "fieldtype": "Section Break",
+   "label": "\u0420\u0456\u0448\u0435\u043d\u043d\u044f"
+  },
+  {
+   "depends_on": "eval:doc.state=='\u0412\u0456\u0434\u0445\u0438\u043b\u0435\u043d\u043e'",
+   "fieldname": "reject_reason",
+   "fieldtype": "Small Text",
+   "label": "\u041f\u0440\u0438\u0447\u0438\u043d\u0430 \u0432\u0456\u0434\u0445\u0438\u043b\u0435\u043d\u043d\u044f"
+  },
+  {
+   "fieldname": "approved_by",
+   "fieldtype": "Link",
+   "label": "\u0417\u0430\u0442\u0432\u0435\u0440\u0434\u0438\u0432",
+   "options": "User",
+   "read_only": 1
+  },
+  {
+   "fieldname": "col_result",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "approved_on",
+   "fieldtype": "Datetime",
+   "label": "\u0417\u0430\u0442\u0432\u0435\u0440\u0434\u0436\u0435\u043d\u043e",
+   "read_only": 1
+  },
+  {
+   "fieldname": "applied_on",
+   "fieldtype": "Datetime",
+   "label": "\u0417\u0430\u0441\u0442\u043e\u0441\u043e\u0432\u0430\u043d\u043e",
+   "read_only": 1
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-10-02 22:19:51.742271",
+ "modified_by": "Administrator",
+ "module": "UA Compliance",
+ "name": "UA Update Package",
+ "naming_rule": "Expression (old style)",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "All",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "\u0412\u0456\u0434\u043f\u043e\u0432\u0456\u0434\u0430\u043b\u044c\u043d\u0438\u0439 \u0437\u0430 \u0437\u0430\u043a\u043e\u043d\u043e\u0434\u0430\u0432\u0441\u0442\u0432\u043e",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "channel",
+ "track_changes": 1
+}

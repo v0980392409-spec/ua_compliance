@@ -47,3 +47,50 @@ def get_rate(currency, on_date=None):
 			_("Офіційний курс НБУ на {0} не завантажено").format(on_date.strftime("%d.%m.%Y"))
 		)
 	return rate
+
+
+def _package_bytes(package):
+	"""Читає вкладений файл пакета. Пакет завжди приходить файлом — і з каналу роздачі,
+	і в ізольованому контурі, тому шлях читання один (FR-036)."""
+	attachments = frappe.get_all(
+		"File",
+		filters={"attached_to_doctype": "UA Update Package", "attached_to_name": package.name},
+		fields=["name", "file_name"],
+		order_by="creation desc",
+		limit=1,
+	)
+	if not attachments:
+		frappe.throw(_("До пакета не прикріплено файл"))
+	return frappe.get_doc("File", attachments[0].name).get_content(encodings=[])
+
+
+@frappe.whitelist()
+def verify_package(name):
+	"""Перевіряє прикріплений пакет за контрактом і будує передпоказ."""
+	package = frappe.get_doc("UA Update Package", name)
+	ok = package.run_verification(_package_bytes(package))
+	package.reload()
+	return {"ok": ok, "state": package.state, "reason": package.reject_reason}
+
+
+@frappe.whitelist()
+def approve_package(name):
+	"""Затвердження людиною і застосування однією транзакцією."""
+	package = frappe.get_doc("UA Update Package", name)
+	summary = package.approve_and_apply(_package_bytes(package))
+	return {"state": "Застосовано", **summary}
+
+
+@frappe.whitelist()
+def reject_package(name, reason):
+	"""Відхилення з обов'язковою причиною."""
+	if not (reason or "").strip():
+		frappe.throw(_("Вкажіть причину відхилення"))
+	package = frappe.get_doc("UA Update Package", name)
+	package.state = "Відхилено"
+	package.reject_reason = reason
+	package.save(ignore_permissions=True)
+	from ua_compliance import journal
+
+	journal.write("Приймання пакета", "Помилка", f"Відхилено вручну: {reason}", package=package.name)
+	return {"state": package.state}

@@ -1,0 +1,123 @@
+# Copyright (c) 2026, Riverside and Contributors
+# See license.txt
+"""Пакет оновлень: прийняття, перевірка, передпоказ, застосування.
+
+Автоматичного застосування немає свідомо: у 2017 році через сервер оновлень
+українського бухгалтерського ПЗ пройшла атака, і клієнти ставили все, що приходило.
+Тут рішення приймає людина, а система лише показує, що саме зміниться.
+"""
+
+import frappe
+from frappe import _
+from frappe.model.document import Document
+from frappe.utils import now_datetime
+
+from ua_compliance import journal
+from ua_compliance.packages import apply as package_apply
+from ua_compliance.packages import parse as package_parse
+from ua_compliance.packages import preview as package_preview
+from ua_compliance.packages import verify as package_verify
+from ua_compliance.packages.reader import PackageError
+
+APPROVER_ROLE = "Відповідальний за законодавство"
+FINAL_STATES = ("Застосовано",)
+
+
+class UAUpdatePackage(Document):
+	def validate(self):
+		if not self.is_new():
+			previous = self.get_doc_before_save()
+			if previous and previous.state in FINAL_STATES and self.state != previous.state:
+				# Застосований пакет не «відміняється» заднім числом: виправлення йде
+				# наступним пакетом, інакше захист від відкоту версії втрачає сенс (FR-035).
+				frappe.throw(
+					_("Застосований пакет не скасовується — виправлення приходить наступним пакетом")
+				)
+		if self.state == "Відхилено" and not self.reject_reason:
+			frappe.throw(_("Вкажіть причину відхилення"))
+
+	def on_trash(self):
+		frappe.throw(_("Пакет оновлень не видаляється — він є слідом рішення"))
+
+	def run_verification(self, raw):
+		"""Перевірка за контрактом. Будь-яка невдача — стан «Відхилено» з причиною."""
+		started = now_datetime()
+		try:
+			result = package_verify.verify(raw, package_verify.last_applied_version(self.channel_code))
+		except PackageError as error:
+			self.state = "Відхилено"
+			self.reject_reason = str(error)
+			self.save(ignore_permissions=True)
+			journal.write("Приймання пакета", "Помилка", str(error), package=self.name, started_at=started)
+			return False
+
+		manifest = result["manifest"]
+		self.manifest_hash = result["manifest_hash"]
+		self.key_ids = ", ".join(result["key_ids"])
+		self.signatures_ok = len(result["key_ids"])
+		self.expires_on = manifest.get("expires")
+		self.min_app_version = manifest.get("min_app_version")
+		self.notes = manifest.get("notes")
+		self.set("files", [])
+		for row in result["files"]:
+			self.append("files", row)
+		self.set("preview", [])
+		for row in package_preview.build(result["rows"]):
+			self.append("preview", row)
+		self.state = "До застосування"
+		self.save(ignore_permissions=True)
+		journal.write(
+			"Приймання пакета",
+			"Успішно",
+			f"Підписів {self.signatures_ok}, рядків {len(result['rows'])}",
+			package=self.name,
+			started_at=started,
+			counts={"checked": len(result["rows"])},
+		)
+		return True
+
+	def approve_and_apply(self, raw):
+		"""Затвердження людиною і застосування однією транзакцією."""
+		if APPROVER_ROLE not in frappe.get_roles() and frappe.session.user != "Administrator":
+			frappe.throw(_("Затверджувати пакет може лише роль «{0}»").format(APPROVER_ROLE))
+		if self.state != "До застосування":
+			frappe.throw(_("Пакет у стані «{0}» не затверджується").format(self.state))
+
+		conflicts = [row for row in self.preview if row.conflict]
+		if conflicts:
+			frappe.throw(
+				_("Є розходження з записами, введеними вручну ({0}). Прийміть рішення по кожному").format(
+					", ".join(sorted({row.code for row in conflicts}))
+				)
+			)
+
+		started = now_datetime()
+		result = package_verify.verify(raw, package_verify.last_applied_version(self.channel_code))
+		summary = package_apply.apply_parameters(result["rows"], f"{self.channel} {self.version}")
+
+		self.state = "Застосовано"
+		self.approved_by = frappe.session.user
+		self.approved_on = now_datetime()
+		self.applied_on = now_datetime()
+		self.save(ignore_permissions=True)
+		journal.write(
+			"Застосування пакета",
+			"Успішно",
+			f"Створено {summary['created']}, закрито {summary['closed']}, оновлено {summary['updated']}",
+			package=self.name,
+			started_at=started,
+			counts={"created": summary["created"], "updated": summary["updated"] + summary["closed"]},
+		)
+		return summary
+
+
+def receive(raw: bytes, channel_code: str, version, file_name=""):
+	"""Приймає пакет у систему: створює документ у стані «Отримано»."""
+	doc = frappe.new_doc("UA Update Package")
+	doc.channel = package_parse.CHANNEL_BY_CODE[channel_code]
+	doc.channel_code = channel_code
+	doc.version = str(version)
+	doc.state = "Отримано"
+	doc.notes = file_name
+	doc.insert(ignore_permissions=True)
+	return doc

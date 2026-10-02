@@ -20,6 +20,7 @@
   "updated_count",
   "sec_msg",
   "message",
+  "package",
   "triggered_by"
  ],
  "fields": [
@@ -96,12 +97,19 @@
    "fieldtype": "Link",
    "label": "\u0417\u0430\u043f\u0443\u0441\u0442\u0438\u0432",
    "options": "User"
+  },
+  {
+   "fieldname": "package",
+   "fieldtype": "Link",
+   "label": "\u041f\u0430\u043a\u0435\u0442",
+   "options": "UA Update Package",
+   "read_only": 1
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-10-02 21:44:02.186403",
+ "modified": "2026-10-02 22:26:13.553430",
  "modified_by": "Administrator",
  "module": "UA Compliance",
  "name": "UA Operation Log",

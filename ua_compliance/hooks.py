@@ -21,5 +21,7 @@ scheduler_events = {
 	"cron": {
 		"0 7 * * *": ["ua_compliance.rates.job.scheduled_load_rates"],
 		"30 17 * * *": ["ua_compliance.rates.job.scheduled_load_rates"],
+		# Раз на добу — попередження про давність оновлень і прострочені пакети.
+		"15 8 * * *": ["ua_compliance.packages.jobs.warn_about_updates"],
 	}
 }

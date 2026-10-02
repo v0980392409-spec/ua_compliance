@@ -1,0 +1,70 @@
+{
+ "actions": [],
+ "allow_bulk_edit": 1,
+ "allow_rename": 1,
+ "creation": "2026-10-02 22:19:51.310258",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "file_name",
+  "size",
+  "sha256",
+  "rows_count",
+  "check_result"
+ ],
+ "fields": [
+  {
+   "columns": 4,
+   "fieldname": "file_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "\u0424\u0430\u0439\u043b",
+   "reqd": 1
+  },
+  {
+   "columns": 1,
+   "fieldname": "size",
+   "fieldtype": "Int",
+   "in_list_view": 1,
+   "label": "\u0420\u043e\u0437\u043c\u0456\u0440"
+  },
+  {
+   "columns": 4,
+   "fieldname": "sha256",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "\u0425\u0435\u0448"
+  },
+  {
+   "columns": 1,
+   "fieldname": "rows_count",
+   "fieldtype": "Int",
+   "in_list_view": 1,
+   "label": "\u0420\u044f\u0434\u043a\u0456\u0432"
+  },
+  {
+   "columns": 2,
+   "fieldname": "check_result",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "\u041f\u0435\u0440\u0435\u0432\u0456\u0440\u043a\u0430",
+   "options": "\n\u0417\u0431\u0456\u0433\u043b\u043e\u0441\u044f\n\u041d\u0435 \u0437\u0431\u0456\u0433\u043b\u043e\u0441\u044f"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "istable": 1,
+ "links": [],
+ "modified": "2026-10-02 22:19:51.310258",
+ "modified_by": "Administrator",
+ "module": "UA Compliance",
+ "name": "UA Update Package File",
+ "owner": "Administrator",
+ "permissions": [],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": []
+}
