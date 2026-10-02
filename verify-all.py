@@ -46,7 +46,6 @@ BEFORE = {
 apps = frappe.get_installed_apps()
 chk("застосунок ua_compliance встановлено", "ua_compliance" in apps, str(apps))
 
-import ua_compliance  # noqa: E402
 from ua_compliance import api  # noqa: E402
 from ua_compliance.rates import job, parse, source, writer  # noqa: E402
 
