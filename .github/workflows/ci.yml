@@ -1,0 +1,28 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+      - name: Install tools
+        run: pip install ruff
+      - name: Lint
+        run: ruff check .
+      - name: Compile
+        run: python -m compileall -q ua_compliance tests
+      - name: Unit tests
+        run: |
+          if ls tests/test_*.py >/dev/null 2>&1; then
+            pip install pytest && pytest -q
+          else
+            echo "Тестів ще немає — крок пропущено"
+          fi
