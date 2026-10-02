@@ -157,11 +157,15 @@ except frappe.ValidationError as error:
 	)
 
 # 6. Завантаження: ідемпотентність і журнал
+# Ідемпотентність перевіряється двома прогонами підряд, а не припущенням, що курс
+# уже вантажили раніше: на чистому екземплярі перший прогін законно створює записи
+# (спіймано на екземплярі кадрів 02.10.2026).
+first_run = job.load_rates(days=2, write_log=True)
 summary = job.load_rates(days=2, write_log=True)
 chk(
 	"повторне завантаження не створює записів (FR-008)",
 	summary["created"] == 0 and not summary["errors"],
-	f"створено {summary['created']}, оновлено {summary['updated']}, помилки {summary['errors']}",
+	f"перший прогін створив {first_run['created']}, повторний {summary['created']}, помилки {summary['errors']}",
 )
 
 log = frappe.get_all(
