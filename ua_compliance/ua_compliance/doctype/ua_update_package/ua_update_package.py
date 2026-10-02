@@ -20,6 +20,10 @@ from ua_compliance.packages import verify as package_verify
 from ua_compliance.packages.reader import PackageError
 
 APPROVER_ROLE = "Відповідальний за законодавство"
+# Передпоказ має допомогти людині ухвалити рішення, а не відтворити весь пакет:
+# у класифікаторі змін бувають десятки тисяч, і документ з такою кількістю рядків
+# не зберігається (спіймано харнесом 02.10.2026 на 32 000 кодів КАТОТТГ).
+PREVIEW_LIMIT = 200
 FINAL_STATES = ("Застосовано",)
 
 
@@ -62,8 +66,14 @@ class UAUpdatePackage(Document):
 		for row in result["files"]:
 			self.append("files", row)
 		self.set("preview", [])
-		for row in package_preview.build(result["rows"]):
+		shown = result["rows"][:PREVIEW_LIMIT]
+		for row in package_preview.build(shown, self.channel_code):
 			self.append("preview", row)
+		total = len(result["rows"])
+		if total > len(shown):
+			self.notes = (self.notes or "") + _(
+				"\nЗмін усього: {0}, у передпоказі показано перші {1}"
+			).format(total, len(shown))
 		self.state = "До застосування"
 		self.save(ignore_permissions=True)
 		journal.write(
@@ -93,7 +103,11 @@ class UAUpdatePackage(Document):
 
 		started = now_datetime()
 		result = package_verify.verify(raw, package_verify.last_applied_version(self.channel_code))
-		summary = package_apply.apply_parameters(result["rows"], f"{self.channel} {self.version}")
+		reference = f"{self.channel} {self.version}"
+		if self.channel_code == "classifiers":
+			summary = package_apply.apply_classifiers(result["rows"], reference)
+		else:
+			summary = package_apply.apply_parameters(result["rows"], reference)
 
 		self.state = "Застосовано"
 		self.approved_by = frappe.session.user

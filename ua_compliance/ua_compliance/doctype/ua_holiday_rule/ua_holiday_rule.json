@@ -1,0 +1,175 @@
+{
+ "actions": [],
+ "allow_bulk_edit": 1,
+ "allow_rename": 1,
+ "autoname": "format:{holiday_name}-{valid_from}",
+ "creation": "2026-10-02 22:47:38.843567",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "holiday_name",
+  "rule_type",
+  "day",
+  "month",
+  "offset_days",
+  "col_1",
+  "is_day_off",
+  "valid_from",
+  "valid_to",
+  "sec_basis",
+  "basis_type",
+  "basis_number",
+  "basis_date",
+  "col_2",
+  "basis_url",
+  "source",
+  "source_reference"
+ ],
+ "fields": [
+  {
+   "fieldname": "holiday_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "\u041d\u0430\u0437\u0432\u0430",
+   "reqd": 1
+  },
+  {
+   "default": "\u0424\u0456\u043a\u0441\u043e\u0432\u0430\u043d\u0430 \u0434\u0430\u0442\u0430",
+   "fieldname": "rule_type",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "\u0412\u0438\u0434 \u043f\u0440\u0430\u0432\u0438\u043b\u0430",
+   "options": "\u0424\u0456\u043a\u0441\u043e\u0432\u0430\u043d\u0430 \u0434\u0430\u0442\u0430\n\u0412\u0435\u043b\u0438\u043a\u0434\u0435\u043d\u044c\n\u0422\u0440\u0456\u0439\u0446\u044f",
+   "reqd": 1
+  },
+  {
+   "depends_on": "eval:doc.rule_type=='\u0424\u0456\u043a\u0441\u043e\u0432\u0430\u043d\u0430 \u0434\u0430\u0442\u0430'",
+   "fieldname": "day",
+   "fieldtype": "Int",
+   "in_list_view": 1,
+   "label": "\u0414\u0435\u043d\u044c"
+  },
+  {
+   "depends_on": "eval:doc.rule_type=='\u0424\u0456\u043a\u0441\u043e\u0432\u0430\u043d\u0430 \u0434\u0430\u0442\u0430'",
+   "fieldname": "month",
+   "fieldtype": "Int",
+   "in_list_view": 1,
+   "label": "\u041c\u0456\u0441\u044f\u0446\u044c"
+  },
+  {
+   "depends_on": "eval:doc.rule_type!='\u0424\u0456\u043a\u0441\u043e\u0432\u0430\u043d\u0430 \u0434\u0430\u0442\u0430'",
+   "fieldname": "offset_days",
+   "fieldtype": "Int",
+   "label": "\u0417\u0441\u0443\u0432 \u0443 \u0434\u043d\u044f\u0445"
+  },
+  {
+   "fieldname": "col_1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "1",
+   "fieldname": "is_day_off",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "label": "\u0412\u0438\u0445\u0456\u0434\u043d\u0438\u0439 \u0434\u0435\u043d\u044c"
+  },
+  {
+   "fieldname": "valid_from",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "label": "\u0414\u0456\u0454 \u0437",
+   "reqd": 1
+  },
+  {
+   "fieldname": "valid_to",
+   "fieldtype": "Date",
+   "label": "\u0414\u0456\u0454 \u0434\u043e"
+  },
+  {
+   "fieldname": "sec_basis",
+   "fieldtype": "Section Break",
+   "label": "\u041f\u0456\u0434\u0441\u0442\u0430\u0432\u0430"
+  },
+  {
+   "fieldname": "basis_type",
+   "fieldtype": "Select",
+   "label": "\u0412\u0438\u0434 \u043d\u043e\u0440\u043c\u0438",
+   "options": "\u0417\u0430\u043a\u043e\u043d\n\u041f\u043e\u0441\u0442\u0430\u043d\u043e\u0432\u0430 \u041a\u041c\u0423\n\u041d\u0430\u043a\u0430\u0437 \u041c\u0456\u043d\u0444\u0456\u043d\u0443\n\u041d\u0430\u043a\u0430\u0437\n\u0420\u0456\u0448\u0435\u043d\u043d\u044f\n\u0406\u043d\u0448\u0435",
+   "reqd": 1
+  },
+  {
+   "fieldname": "basis_number",
+   "fieldtype": "Data",
+   "label": "\u041d\u043e\u043c\u0435\u0440 \u043d\u043e\u0440\u043c\u0438",
+   "reqd": 1
+  },
+  {
+   "fieldname": "basis_date",
+   "fieldtype": "Date",
+   "label": "\u0414\u0430\u0442\u0430 \u043d\u043e\u0440\u043c\u0438",
+   "reqd": 1
+  },
+  {
+   "fieldname": "col_2",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "basis_url",
+   "fieldtype": "Data",
+   "label": "\u041f\u043e\u0441\u0438\u043b\u0430\u043d\u043d\u044f \u043d\u0430 \u0442\u0435\u043a\u0441\u0442",
+   "reqd": 1
+  },
+  {
+   "default": "\u0412\u0432\u0435\u0434\u0435\u043d\u043e \u0432\u0440\u0443\u0447\u043d\u0443",
+   "fieldname": "source",
+   "fieldtype": "Select",
+   "label": "\u0414\u0436\u0435\u0440\u0435\u043b\u043e \u0437\u0430\u043f\u0438\u0441\u0443",
+   "options": "\u0417 \u043f\u0430\u043a\u0435\u0442\u0430\n\u0412\u0432\u0435\u0434\u0435\u043d\u043e \u0432\u0440\u0443\u0447\u043d\u0443",
+   "reqd": 1
+  },
+  {
+   "fieldname": "source_reference",
+   "fieldtype": "Data",
+   "label": "\u041f\u0430\u043a\u0435\u0442 \u0456 \u0432\u0435\u0440\u0441\u0456\u044f",
+   "read_only": 1
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-10-02 22:56:45.969572",
+ "modified_by": "Administrator",
+ "module": "UA Compliance",
+ "name": "UA Holiday Rule",
+ "naming_rule": "Expression (old style)",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "All"
+  },
+  {
+   "create": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "\u0412\u0456\u0434\u043f\u043e\u0432\u0456\u0434\u0430\u043b\u044c\u043d\u0438\u0439 \u0437\u0430 \u0437\u0430\u043a\u043e\u043d\u043e\u0434\u0430\u0432\u0441\u0442\u0432\u043e",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "month",
+ "sort_order": "ASC",
+ "states": [],
+ "title_field": "holiday_name",
+ "track_changes": 1
+}

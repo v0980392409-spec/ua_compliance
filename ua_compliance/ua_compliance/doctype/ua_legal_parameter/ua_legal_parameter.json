@@ -195,7 +195,7 @@
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-10-02 21:59:41.811897",
+ "modified": "2026-10-02 22:56:45.649153",
  "modified_by": "Administrator",
  "module": "UA Compliance",
  "name": "UA Legal Parameter",
@@ -203,20 +203,15 @@
  "owner": "Administrator",
  "permissions": [
   {
-   "create": 1,
-   "delete": 1,
    "email": 1,
    "export": 1,
    "print": 1,
    "read": 1,
    "report": 1,
-   "role": "All",
-   "share": 1,
-   "write": 1
+   "role": "All"
   },
   {
    "create": 1,
-   "delete": 1,
    "email": 1,
    "export": 1,
    "print": 1,

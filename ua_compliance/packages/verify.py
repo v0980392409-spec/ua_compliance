@@ -81,12 +81,16 @@ def verify(raw: bytes, last_applied_version=None):
 	channel_code = manifest.get("channel")
 	if channel_code not in package_parse.CHANNEL_BY_CODE:
 		raise PackageError(f"Пакет не прийнято: невідомий канал {channel_code}")
-	if channel_code != "parameters":
+	if channel_code == "calendar":
 		raise PackageError(f"Пакет не прийнято: канал {channel_code} ще не підтримується")
+
+	parser = (
+		package_parse.parse_parameters if channel_code == "parameters" else package_parse.parse_classifiers
+	)
 
 	rows = []
 	for entry in declared:
-		rows += package_parse.parse_parameters(entry["name"], data_files[entry["name"]])
+		rows += parser(entry["name"], data_files[entry["name"]])
 
 	return {
 		"manifest": manifest,
@@ -98,7 +102,7 @@ def verify(raw: bytes, last_applied_version=None):
 				"file_name": entry["name"],
 				"size": entry.get("size"),
 				"sha256": entry.get("sha256"),
-				"rows_count": len(package_parse.parse_parameters(entry["name"], data_files[entry["name"]])),
+				"rows_count": len(parser(entry["name"], data_files[entry["name"]])),
 				"check_result": "Збіглося",
 			}
 			for entry in declared

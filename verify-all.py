@@ -40,7 +40,15 @@ def chk(name, ok, note=""):
 # Знімок того, що існувало ДО прогону.
 BEFORE = {
 	dt: set(frappe.get_all(dt, pluck="name"))
-	for dt in ("Currency Exchange", "UA Operation Log", "UA Legal Parameter", "UA Update Package")
+	for dt in (
+		"Currency Exchange",
+		"UA Operation Log",
+		"UA Legal Parameter",
+		"UA Update Package",
+		"UA Holiday Rule",
+		"Holiday List",
+		"UA Classifier Entry",
+	)
 	if frappe.db.exists("DocType", dt)
 }
 
@@ -488,7 +496,234 @@ finally:
 
 chk("бойові ключі не лишилися підміненими перевіркою", keys_module.TRUSTED_KEYS == _production_keys)
 
-# 10. Прибирання за собою
+# 10. Календар і норма часу (US4)
+from ua_compliance.calendar import build as calendar_build
+
+MARTIAL_CODE = "TEST_MARTIAL_LAW"
+frappe.db.delete("UA Legal Parameter", {"code": MARTIAL_CODE})
+for name in frappe.get_all("UA Holiday Rule", filters={"holiday_name": ["like", "Перевірка %"]}, pluck="name"):
+	frappe.db.delete("UA Holiday Rule", {"name": name})
+
+
+def make_flag(valid_from, value, valid_to=None):
+	doc = frappe.get_doc(
+		{
+			"doctype": "UA Legal Parameter",
+			"code": MARTIAL_CODE,
+			"parameter_name": "Воєнний стан (перевірка)",
+			"value_type": "Ознака",
+			"value_flag": value,
+			"valid_from": valid_from,
+			"valid_to": valid_to,
+			"basis_type": "Закон",
+			"basis_number": "2136-IX",
+			"basis_date": "2022-03-15",
+			"basis_url": "https://zakon.rada.gov.ua/laws/show/2136-20",
+			"source": "Введено вручну",
+			"verified_on": "2026-10-02",
+		}
+	)
+	doc.insert(ignore_permissions=True)
+	return doc
+
+
+def make_rule(name, day, month, rule_type="Фіксована дата", valid_from="2020-01-01"):
+	return frappe.get_doc(
+		{
+			"doctype": "UA Holiday Rule",
+			"holiday_name": name,
+			"rule_type": rule_type,
+			"day": day,
+			"month": month,
+			"is_day_off": 1,
+			"valid_from": valid_from,
+			"basis_type": "Закон",
+			"basis_number": "322-08",
+			"basis_date": "1971-12-10",
+			"basis_url": "https://zakon.rada.gov.ua/laws/show/322-08",
+			"source": "Введено вручну",
+		}
+	).insert(ignore_permissions=True)
+
+
+flag_war = make_flag("2022-03-15", 1, valid_to="2026-12-31")
+flag_peace = make_flag("2027-01-01", 0)
+rule_new_year = make_rule("Перевірка: Новий рік", 1, 1)
+rule_easter = make_rule("Перевірка: Великдень", None, None, rule_type="Великдень")
+
+TITLE_2027 = "Перевірка календаря 2027"
+war_title = "Перевірка календаря 2025"
+
+# 2027 — воєнний стан уже закінчився: свята стають вихідними
+built = calendar_build.build_holiday_list(2027, title=TITLE_2027, martial_law_code=MARTIAL_CODE)
+chk(
+	"після закінчення воєнного стану свята стають вихідними (FR-041)",
+	built["martial_law"] is False and built["holidays"] >= 1,
+	str(built),
+)
+
+again = calendar_build.build_holiday_list(2027, title=TITLE_2027, martial_law_code=MARTIAL_CODE)
+rows_2027 = frappe.db.count("Holiday", {"parent": TITLE_2027})
+chk(
+	"повторна побудова дає той самий склад без дублів (FR-043)",
+	again["total"] == built["total"] == rows_2027,
+	f"{built['total']} = {again['total']} = {rows_2027}",
+)
+
+# 2025 — воєнний стан діє: свята не вихідні
+built_war = calendar_build.build_holiday_list(2025, title=war_title, martial_law_code=MARTIAL_CODE)
+chk(
+	"у воєнний стан свята не є вихідними (FR-041)",
+	built_war["martial_law"] is True and built_war["holidays"] == 0,
+	str(built_war),
+)
+
+# Перебудова, що зачіпає минулі дати, потребує підтвердження
+flag_war.valid_to = "2024-12-31"
+flag_war.save(ignore_permissions=True)
+make_flag("2025-01-01", 0, valid_to="2026-12-31")
+try:
+	calendar_build.build_holiday_list(2025, title=war_title, martial_law_code=MARTIAL_CODE)
+	chk("перебудова за минулі дати потребує підтвердження (FR-046)", False, "пройшла без підтвердження")
+except frappe.ValidationError as error:
+	chk("перебудова за минулі дати потребує підтвердження (FR-046)", "минулих дат" in str(error), str(error)[:90])
+
+confirmed = calendar_build.build_holiday_list(
+	2025, title=war_title, confirm_past=True, martial_law_code=MARTIAL_CODE
+)
+chk(
+	"з підтвердженням перебудова проходить і свята стають вихідними",
+	confirmed["holidays"] >= 1,
+	str(confirmed),
+)
+
+# Норма часу рахується за календарем
+norm = calendar_build.working_time(2027, title=TITLE_2027)
+days_off = frappe.db.count("Holiday", {"parent": TITLE_2027})
+chk(
+	"норма часу рахується за календарем, а не зберігається (FR-044)",
+	norm["working_days"] + days_off == 365 and norm["hours"] == norm["working_days"] * 8,
+	f"робочих {norm['working_days']}, вихідних {days_off}, годин {norm['hours']}",
+)
+
+# 11. Звіт норми часу
+from frappe.desk.query_report import run as run_report
+
+report = run_report(
+	"UA-Норма робочого часу",
+	filters={"year": 2027, "holiday_list": TITLE_2027, "hours_per_day": 8},
+	ignore_prepared_report=True,
+)
+# Платформа може віддати рядки звіту і словниками, і списками — беремо обидва випадки.
+# У звіті ввімкнено підсумковий рядок, тому беремо лише дванадцять місяців.
+month_rows = report["result"][:12]
+report_days = sum(
+	row["working_days"] if isinstance(row, dict) else row[1] for row in month_rows
+)
+chk(
+	"звіт норми часу рахує за календарем",
+	len(month_rows) == 12 and report_days == norm["working_days"],
+	f"місяців {len(month_rows)}, робочих днів {report_days}",
+)
+
+# 12. Класифікатори (US5)
+import time as _time
+
+CLASSIFIER_CSV = """classifier,code,entry_name,parent_code,level,valid_from,valid_to
+КАТОТТГ,UA00000000000000001,Тестова область,,1,2021-01-01,
+КАТОТТГ,UA00000000000000002,Тестовий район,UA00000000000000001,2,2021-01-01,
+КАТОТТГ,UA00000000000000003,Тестова громада,UA00000000000000002,3,2021-01-01,
+"""
+
+keys_module.TRUSTED_KEYS[:] = [key_a, key_b, key_c]
+try:
+	classifier_package = build_package(
+		CLASSIFIER_CSV, channel="classifiers", keys=SIGNERS, version=20261101
+	)
+	package_classifier = receive(classifier_package, "classifiers", 20261101)
+	ok_classifier = package_classifier.run_verification(classifier_package)
+	chk(
+		"пакет класифікатора проходить перевірку",
+		ok_classifier and len(package_classifier.preview) == 3,
+		f"{package_classifier.state}, рядків передпоказу {len(package_classifier.preview)}",
+	)
+
+	package_classifier.approve_and_apply(classifier_package)
+	chk(
+		"коди класифікатора застосовані пакетом",
+		frappe.db.count("UA Classifier Entry", {"code": ["like", "UA000000000000000%"]}) == 3,
+	)
+	# Платформа ставить право на запис за умовчанням, тому права перевіряються
+	# по ВСІХ доктайпах застосунку, а не лише там, де про це згадали (спіймано 02.10.2026).
+	writable_for_all = []
+	deletable = []
+	for doctype_name in frappe.get_all("DocType", filters={"module": "UA Compliance", "istable": 0}, pluck="name"):
+		for perm in frappe.get_all(
+			"DocPerm",
+			filters={"parent": doctype_name},
+			fields=["role", "write", "create", "delete"],
+		):
+			if perm.role == "All" and (perm.write or perm.create):
+				writable_for_all.append(f"{doctype_name}: {perm.role}")
+			if perm.delete:
+				deletable.append(f"{doctype_name}: {perm.role}")
+	chk(
+		"жоден доктайп застосунку не доступний на запис усім (FR-019, FR-048)",
+		not writable_for_all,
+		"; ".join(writable_for_all),
+	)
+	chk(
+		"права на видалення немає ні в кого (принцип III)",
+		not deletable,
+		"; ".join(deletable),
+	)
+
+	# Закриття коду датою
+	closing_csv = CLASSIFIER_CSV.replace(
+		"КАТОТТГ,UA00000000000000003,Тестова громада,UA00000000000000002,3,2021-01-01,",
+		"КАТОТТГ,UA00000000000000003,Тестова громада,UA00000000000000002,3,2021-01-01,2026-09-30",
+	)
+	closing_package = build_package(closing_csv, channel="classifiers", keys=SIGNERS, version=20261102)
+	package_closing = receive(closing_package, "classifiers", 20261102)
+	package_closing.run_verification(closing_package)
+	package_closing.approve_and_apply(closing_package)
+	chk(
+		"виведений код закривається датою, а не видаляється (FR-049)",
+		frappe.db.get_value("UA Classifier Entry", "КАТОТТГ-UA00000000000000003", "valid_to") is not None
+		and frappe.db.exists("UA Classifier Entry", "КАТОТТГ-UA00000000000000003"),
+	)
+
+	from ua_compliance.packages.apply import active_codes
+
+	offered = [row.code for row in active_codes("КАТОТТГ", "2026-10-02", search="UA00000000000000")]
+	chk(
+		"закритий код до вибору не пропонується, чинні лишаються (FR-051)",
+		"UA00000000000000003" not in offered and len(offered) == 2,
+		str(offered),
+	)
+
+	# Обсяг: 32 000 кодів
+	bulk_rows = "\n".join(
+		f"КАТОТТГ,UA9{number:018d},Тестовий запис {number},,4,2021-01-01," for number in range(32000)
+	)
+	bulk_csv = "classifier,code,entry_name,parent_code,level,valid_from,valid_to\n" + bulk_rows + "\n"
+	bulk_package = build_package(bulk_csv, channel="classifiers", keys=SIGNERS, version=20261103)
+	package_bulk = receive(bulk_package, "classifiers", 20261103)
+	started_bulk = _time.time()
+	package_bulk.run_verification(bulk_package)
+	package_bulk.approve_and_apply(bulk_package)
+	elapsed = _time.time() - started_bulk
+	loaded = frappe.db.count("UA Classifier Entry", {"code": ["like", "UA9%"]})
+	chk(
+		"32 000 кодів завантажуються за менш ніж 2 хвилини (SC-008)",
+		loaded == 32000 and elapsed < 120,
+		f"{loaded} кодів за {elapsed:.0f} с",
+	)
+	frappe.db.delete("UA Classifier Entry", {"code": ["like", "UA9%"]})
+finally:
+	keys_module.TRUSTED_KEYS[:] = _production_keys
+
+# 13. Прибирання за собою
 frappe.db.rollback()
 removed = 0
 for doctype, existing in BEFORE.items():

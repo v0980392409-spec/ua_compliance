@@ -4,8 +4,10 @@ import frappe
 from frappe.utils import add_days, getdate
 
 
-def build(rows):
+def build(rows, channel_code="parameters"):
 	"""Повертає список рядків передпоказу для таблиці пакета."""
+	if channel_code == "classifiers":
+		return build_classifiers(rows)
 	changes = []
 	for row in rows:
 		code, valid_from = row["code"], getdate(row["valid_from"])
@@ -80,3 +82,31 @@ def _as_text(record):
 	}[record.value_type]
 	value = record.get(field)
 	return "" if value is None else str(value)
+
+
+def build_classifiers(rows):
+	"""Передпоказ для класифікаторів: що додається і який код закривається датою."""
+	changes = []
+	for row in rows:
+		name = f"{row['classifier']}-{row['code']}"
+		existing = frappe.db.get_value(
+			"UA Classifier Entry", name, ["entry_name", "valid_to"], as_dict=True
+		)
+		if not existing:
+			action, old_value = "Додається", ""
+		elif row.get("valid_to") and not existing.valid_to:
+			action, old_value = "Закривається", existing.entry_name
+		else:
+			action, old_value = "Змінюється", existing.entry_name
+		changes.append(
+			{
+				"entity": "Код класифікатора",
+				"code": row["code"],
+				"action": action,
+				"valid_from": row["valid_from"],
+				"old_value": old_value,
+				"new_value": row["entry_name"],
+				"conflict": 0,
+			}
+		)
+	return changes

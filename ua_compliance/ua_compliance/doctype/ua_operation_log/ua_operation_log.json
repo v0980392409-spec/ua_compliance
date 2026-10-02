@@ -109,7 +109,7 @@
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-10-02 22:26:13.553430",
+ "modified": "2026-10-02 22:56:45.492147",
  "modified_by": "Administrator",
  "module": "UA Compliance",
  "name": "UA Operation Log",
@@ -117,28 +117,21 @@
  "owner": "Administrator",
  "permissions": [
   {
-   "create": 1,
-   "delete": 1,
    "email": 1,
    "export": 1,
    "print": 1,
    "read": 1,
    "report": 1,
-   "role": "All",
-   "share": 1,
-   "write": 1
+   "role": "All"
   },
   {
    "create": 1,
-   "delete": 1,
    "email": 1,
    "export": 1,
    "print": 1,
    "read": 1,
    "report": 1,
-   "role": "System Manager",
-   "share": 1,
-   "write": 1
+   "role": "System Manager"
   }
  ],
  "row_format": "Dynamic",

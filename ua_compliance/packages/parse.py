@@ -60,3 +60,31 @@ def parse_parameters(file_name, raw):
 	if not rows:
 		raise PackageError(f"Пакет не прийнято: {file_name} не містить жодного рядка")
 	return rows
+
+
+CLASSIFIER_COLUMNS = ("classifier", "code", "entry_name", "parent_code", "level", "valid_from", "valid_to")
+REQUIRED_CLASSIFIER_COLUMNS = ("classifier", "code", "entry_name", "valid_from")
+
+
+def parse_classifiers(file_name, raw):
+	"""Повертає список рядків каналу «Класифікатори»."""
+	try:
+		text = raw.decode("utf-8")
+	except UnicodeDecodeError:
+		raise PackageError(f"Пакет не прийнято: {file_name} не у кодуванні UTF-8") from None
+
+	reader = csv.DictReader(io.StringIO(text))
+	missing = set(REQUIRED_CLASSIFIER_COLUMNS) - set(reader.fieldnames or [])
+	if missing:
+		raise PackageError(f"Пакет не прийнято: {file_name}, бракує колонок: {', '.join(sorted(missing))}")
+
+	rows = []
+	for number, row in enumerate(reader, start=2):
+		for column in REQUIRED_CLASSIFIER_COLUMNS:
+			if not (row.get(column) or "").strip():
+				raise PackageError(f"Пакет не прийнято: {file_name}, рядок {number}: не заповнено {column}")
+		rows.append({key: (row.get(key) or "").strip() for key in CLASSIFIER_COLUMNS})
+
+	if not rows:
+		raise PackageError(f"Пакет не прийнято: {file_name} не містить жодного рядка")
+	return rows

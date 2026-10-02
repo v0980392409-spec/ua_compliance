@@ -1,0 +1,106 @@
+{
+ "actions": [],
+ "allow_bulk_edit": 1,
+ "allow_rename": 1,
+ "autoname": "format:{classifier}-{code}",
+ "creation": "2026-10-02 22:51:34.805362",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "classifier",
+  "code",
+  "entry_name",
+  "col_1",
+  "parent_code",
+  "level",
+  "valid_from",
+  "valid_to",
+  "source_reference"
+ ],
+ "fields": [
+  {
+   "fieldname": "classifier",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "\u041a\u043b\u0430\u0441\u0438\u0444\u0456\u043a\u0430\u0442\u043e\u0440",
+   "options": "\u041a\u0410\u0422\u041e\u0422\u0422\u0413\n\u0414\u041a 003\n\u041a\u0412\u0415\u0414\nNACE",
+   "reqd": 1
+  },
+  {
+   "fieldname": "code",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "\u041a\u043e\u0434",
+   "reqd": 1
+  },
+  {
+   "fieldname": "entry_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "\u041d\u0430\u0439\u043c\u0435\u043d\u0443\u0432\u0430\u043d\u043d\u044f",
+   "reqd": 1
+  },
+  {
+   "fieldname": "col_1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "parent_code",
+   "fieldtype": "Data",
+   "label": "\u041a\u043e\u0434 \u0431\u0430\u0442\u044c\u043a\u0456\u0432\u0441\u044c\u043a\u043e\u0433\u043e \u0437\u0430\u043f\u0438\u0441\u0443"
+  },
+  {
+   "fieldname": "level",
+   "fieldtype": "Int",
+   "label": "\u0420\u0456\u0432\u0435\u043d\u044c"
+  },
+  {
+   "fieldname": "valid_from",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "label": "\u0414\u0456\u0454 \u0437",
+   "reqd": 1
+  },
+  {
+   "fieldname": "valid_to",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "label": "\u0414\u0456\u0454 \u0434\u043e"
+  },
+  {
+   "fieldname": "source_reference",
+   "fieldtype": "Data",
+   "label": "\u041f\u0430\u043a\u0435\u0442 \u0456 \u0432\u0435\u0440\u0441\u0456\u044f",
+   "read_only": 1
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-10-02 22:56:45.202304",
+ "modified_by": "Administrator",
+ "module": "UA Compliance",
+ "name": "UA Classifier Entry",
+ "naming_rule": "Expression (old style)",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "All"
+  }
+ ],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "search_fields": "code,entry_name",
+ "sort_field": "code",
+ "sort_order": "ASC",
+ "states": [],
+ "title_field": "entry_name"
+}
