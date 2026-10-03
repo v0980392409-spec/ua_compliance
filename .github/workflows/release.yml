@@ -1,10 +1,14 @@
 name: Release
 
 # Реліз у два кроки, щоб секретні ключі не потрапляли в CI:
-#   1. підписаний тег v* → перевірки, релізний маніфест і ЧЕРНЕТКА релізу;
-#   2. мейнтейнер підписує маніфест двома ключами офлайн, прикладає .minisig до
-#      чернетки й запускає цей workflow вручну з тегом → перевірка 2 з 3 → публікація.
+#   1. draft — підписаний тег v* → перевірки, релізний маніфест і ЧЕРНЕТКА релізу;
+#      запускається пушем тега або вручну (step=draft), якщо пуш-запуск не вдався;
+#   2. publish — мейнтейнер підписує маніфест двома ключами офлайн, прикладає .minisig до
+#      чернетки й запускає цей workflow вручну (step=publish) → перевірка 2 з 3 → публікація.
 # Опублікований реліз незмінний (налаштування репозиторію «Immutable releases»).
+#
+# Ручний запуск бере workflow з main, а код — з тега: тег не переставляється (правило тегів),
+# тому виправлення самого workflow мають діяти й для вже поставленого тега.
 
 on:
   push:
@@ -12,19 +16,28 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "Тег релізу, чернетку якого підписано (наприклад, v0.1.0)"
+        description: "Тег релізу (наприклад, v0.1.0)"
         required: true
+      step:
+        description: "draft — зібрати чернетку; publish — перевірити підписи й опублікувати"
+        required: true
+        type: choice
+        options: [draft, publish]
 
 permissions:
   contents: write
 
+env:
+  TAG: ${{ github.event_name == 'push' && github.ref_name || inputs.tag }}
+
 jobs:
   draft:
-    if: github.event_name == 'push'
+    if: github.event_name == 'push' || inputs.step == 'draft'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
+          ref: refs/tags/${{ env.TAG }}
           fetch-depth: 0
       - uses: actions/setup-python@v5
         with:
@@ -34,30 +47,33 @@ jobs:
       - name: Checks
         run: ruff check . && python -m compileall -q ua_compliance tests tools && pytest -q
       - name: Tag is annotated and signed
-        # Підпис тега перевіряє GitHub; легкий тег (без об'єкта тега) не приймається.
+        # Тип і підпис тега питаємо в GitHub: actions/checkout підміняє анотований тег
+        # легким, і локальний git бачить коміт замість об'єкта тега.
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          sha=$(git rev-parse "refs/tags/${GITHUB_REF_NAME}")
-          [ "$(git cat-file -t "$sha")" = "tag" ] || { echo "Тег ${GITHUB_REF_NAME} не анотований"; exit 1; }
+          ref=$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${TAG}")
+          [ "$(echo "$ref" | jq -r .object.type)" = "tag" ] || { echo "Тег ${TAG} не анотований"; exit 1; }
+          sha=$(echo "$ref" | jq -r .object.sha)
           verified=$(gh api "repos/${GITHUB_REPOSITORY}/git/tags/${sha}" --jq .verification.verified)
-          [ "$verified" = "true" ] || { echo "Підпис тега ${GITHUB_REF_NAME} не перевірено GitHub"; exit 1; }
+          [ "$verified" = "true" ] || { echo "Підпис тега ${TAG} не перевірено GitHub"; exit 1; }
       - name: Release manifest
-        run: python tools/release_manifest.py build "${GITHUB_REF_NAME}" > release-manifest.json
+        run: python tools/release_manifest.py build "${TAG}" > release-manifest.json
       - name: Draft release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "${GITHUB_REF_NAME}" release-manifest.json --draft --verify-tag \
-            --title "${GITHUB_REF_NAME}" \
-            --notes "Чернетка. Підпишіть release-manifest.json двома ключами й запустіть Release вручну з тегом ${GITHUB_REF_NAME}."
+          gh release create "${TAG}" release-manifest.json --draft --verify-tag \
+            --title "${TAG}" \
+            --notes "Чернетка. Підпишіть release-manifest.json двома ключами й запустіть Release вручну: тег ${TAG}, крок publish."
 
   publish:
-    if: github.event_name == 'workflow_dispatch'
+    if: github.event_name == 'workflow_dispatch' && inputs.step == 'publish'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
+          ref: refs/tags/${{ env.TAG }}
           fetch-depth: 0
       - uses: actions/setup-python@v5
         with:
@@ -69,14 +85,11 @@ jobs:
         # «підписати» ключем, доданим пізніше.
         env:
           GH_TOKEN: ${{ github.token }}
-          TAG: ${{ inputs.tag }}
         run: |
-          git checkout --detach "refs/tags/${TAG}"
           mkdir signed
           gh release download "${TAG}" --dir signed --pattern 'release-manifest.json*'
           python tools/release_manifest.py verify "${TAG}" signed
       - name: Publish
         env:
           GH_TOKEN: ${{ github.token }}
-          TAG: ${{ inputs.tag }}
         run: gh release edit "${TAG}" --draft=false --latest
