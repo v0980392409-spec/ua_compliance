@@ -449,6 +449,20 @@ try:
 			"розходження" in str(error),
 			str(error)[:90],
 		)
+	# 9.4а Той самий зміст, що введений вручну: не розходження (найчастіший випадок —
+	# пакет запізнився й привіз те, що вже ввели). У базі 9546.0, у пакеті 9546.
+	make_param("2027-01-01", 9546, code="TEST_PKG_SAME_VALUE")
+	same_value = build_package(
+		PARAMETERS_CSV.replace("TEST_PKG_MIN_WAGE", "TEST_PKG_SAME_VALUE"), keys=SIGNERS, version=20261015
+	)
+	package_same, ok_same = take(same_value, version=20261015)
+	same_rows = [(r.action, r.conflict) for r in package_same.preview if r.code == "TEST_PKG_SAME_VALUE"]
+	chk(
+		"те саме значення, що введене вручну, не є розходженням (FR-032)",
+		ok_same and same_rows == [("Змінюється", 0)],
+		str(same_rows),
+	)
+
 	# 9.5 Той самий пакет файлом (ізольований контур) і кнопки форми
 	offline = build_package(
 		PARAMETERS_CSV.replace("TEST_PKG_MIN_WAGE", "TEST_PKG_OFFLINE"), keys=SIGNERS, version=20261009
@@ -853,6 +867,25 @@ try:
 	frappe.db.delete("UA Classifier Entry", {"code": ["like", "UA9%"]})
 finally:
 	keys_module.TRUSTED_KEYS[:] = _production_keys
+
+# 12а. Розділ «Законодавство»: ярлики з контракту екранів (pages-ui, екран 11), читаємо
+# збережений воркспейс, а не файл, — migrate буває, що підміняє його
+workspace = frappe.get_doc("Workspace", "Законодавство")
+CONTRACT_SHORTCUTS = [
+	"Законодавчі параметри", "Пакети оновлень", "Курси валют", "Свята",
+	"Класифікатори", "Журнал операцій", "Норма робочого часу",
+]
+chk(
+	"розділ «Законодавство» має ярлики з контракту екранів",
+	[row.label for row in workspace.shortcuts] == CONTRACT_SHORTCUTS,
+	", ".join(row.label for row in workspace.shortcuts),
+)
+dangling = [
+	row.link_to
+	for row in list(workspace.shortcuts) + [r for r in workspace.links if r.type == "Link"]
+	if not frappe.db.exists("Report" if (row.get("type") == "Report" or row.get("link_type") == "Report") else "DocType", row.link_to)
+]
+chk("усі посилання розділу ведуть на наявні екрани", not dangling, ", ".join(dangling))
 
 # 13. Прибирання за собою
 frappe.db.rollback()

@@ -26,7 +26,7 @@ def build(rows, channel_code="parameters"):
 					"valid_from": valid_from,
 					"old_value": _as_text(same),
 					"new_value": row["value"],
-					"conflict": 1 if same.source == "Введено вручну" and str(_as_text(same)) != str(row["value"]) else 0,
+					"conflict": 1 if same.source == "Введено вручну" and not _same_value(same, row["value"]) else 0,
 				}
 			)
 			continue
@@ -69,6 +69,27 @@ def build(rows, channel_code="parameters"):
 			}
 		)
 	return changes
+
+
+def _same_value(record, incoming):
+	"""Чи збігається значення запису зі значенням з пакета — за змістом, а не за записом.
+
+	Числове поле в базі повертається як 8647.0, у CSV стоїть 8647: порівняння рядків
+	бачило б розходження там, де його немає, і блокувало б найчастіший випадок —
+	пакет запізнився й привіз те саме, що вже ввели вручну.
+	"""
+	current = _as_text(record)
+	incoming = (incoming or "").strip()
+	try:
+		if record.value_type in ("Сума", "Число", "Відсоток"):
+			return float(current) == float(incoming)
+		if record.value_type == "Дата":
+			return getdate(current) == getdate(incoming)
+		if record.value_type == "Ознака":
+			return int(float(current or 0)) == int(float(incoming or 0))
+	except (TypeError, ValueError):
+		return False
+	return current == incoming
 
 
 def _as_text(record):
