@@ -921,6 +921,22 @@ dangling = [
 ]
 chk("усі посилання розділу ведуть на наявні екрани", not dangling, ", ".join(dangling))
 
+# Бокова панель розділу (контракт екранів, екран 11): без власного файла desk збирає її
+# сам із доктайпів модуля — з технічними іменами й без половини екранів
+sidebar = frappe.get_doc("Workspace Sidebar", "Законодавство") if frappe.db.exists("Workspace Sidebar", "Законодавство") else None
+sidebar_links = [row for row in (sidebar.items if sidebar else []) if row.type == "Link"]
+chk(
+	"бокова панель розділу — з ярликами контракту, українськими підписами",
+	sidebar is not None
+	and all(label in [row.label for row in sidebar_links] for label in CONTRACT_SHORTCUTS)
+	and not any(row.label.startswith("UA ") for row in sidebar_links),
+	", ".join(row.label for row in sidebar_links),
+)
+sidebar_dangling = [
+	row.link_to for row in sidebar_links if not frappe.db.exists(row.link_type, row.link_to)
+]
+chk("усі посилання бокової панелі ведуть на наявні екрани", not sidebar_dangling, ", ".join(sidebar_dangling))
+
 # 13. Прибирання за собою
 frappe.db.rollback()
 removed = 0
