@@ -742,6 +742,40 @@ chk(
 	str(confirmed),
 )
 
+journal_past = frappe.get_all(
+	"UA Operation Log",
+	filters={"kind": "Перебудова календаря", "message": ["like", f"{war_title}%підтверджено зміну минулих дат%"]},
+	pluck="message",
+)
+chk("підтверджена перебудова минулих дат записана в журнал (FR-046)", bool(journal_past), "; ".join(journal_past)[:120])
+
+# Кнопка «Побудувати календар»: серверний метод на пісочному році 2099 (лише майбутні
+# дати). Чинний робочий параметр воєнного стану не чіпаємо: якщо на екземплярі його
+# немає, метод має відмовити, а не вигадати ознаку.
+SANDBOX_YEAR = 2099
+try:
+	via_api = api.rebuild_calendar(SANDBOX_YEAR)
+	chk(
+		"кнопка будує календар року й пише журнал",
+		frappe.db.exists("Holiday List", via_api["title"])
+		and frappe.db.exists("UA Operation Log", {"kind": "Перебудова календаря", "message": ["like", f"{via_api['title']}%"]}),
+		str(via_api),
+	)
+except frappe.ValidationError as error:
+	chk(
+		"кнопка будує календар року й пише журнал",
+		"не визначено" in str(error),
+		f"ознаки воєнного стану на екземплярі немає — відмова: {str(error)[:80]}",
+	)
+frappe.set_user("Guest")
+try:
+	api.rebuild_calendar(SANDBOX_YEAR)
+	chk("будувати календар без ролі не можна", False, "побудувався")
+except frappe.ValidationError as error:
+	chk("будувати календар без ролі не можна", "лише роль" in str(error), str(error)[:80])
+finally:
+	frappe.set_user("Administrator")
+
 # Норма часу рахується за календарем
 norm = calendar_build.working_time(2027, title=TITLE_2027)
 days_off = frappe.db.count("Holiday", {"parent": TITLE_2027})

@@ -94,3 +94,23 @@ def reject_package(name, reason):
 
 	journal.write("Приймання пакета", "Помилка", f"Відхилено вручну: {reason}", package=package.name)
 	return {"state": package.state}
+
+
+CALENDAR_ROLES = ("Відповідальний за законодавство", "System Manager")
+
+
+@frappe.whitelist()
+def rebuild_calendar(year, confirm_past=0):
+	"""Будує робочий календар року з правил свят і ознаки воєнного стану.
+
+	Якщо перебудова змінює минулі дати, повертає запит на підтвердження замість
+	помилки: кнопка показує його людині й повторює виклик з confirm_past (FR-046).
+	"""
+	from ua_compliance.calendar.build import PastDatesChange, build_holiday_list
+
+	if not set(CALENDAR_ROLES) & set(frappe.get_roles()):
+		frappe.throw(_("Будувати календар може лише роль «{0}»").format(CALENDAR_ROLES[0]))
+	try:
+		return build_holiday_list(int(year), confirm_past=bool(int(confirm_past or 0)))
+	except PastDatesChange as error:
+		return {"needs_confirmation": str(error)}

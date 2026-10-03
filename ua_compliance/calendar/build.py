@@ -19,6 +19,10 @@ MARTIAL_LAW_CODE = "MARTIAL_LAW"
 WEEKEND_WEEKDAYS = (5, 6)  # субота і неділя
 
 
+class PastDatesChange(frappe.ValidationError):
+	"""Перебудова зачіпає минулі дати й чекає явного підтвердження (FR-046)."""
+
+
 def martial_law_active(on_date, code=MARTIAL_LAW_CODE):
 	"""Ознака воєнного стану — звичайний параметр: не визначена, значить невідома.
 
@@ -108,7 +112,8 @@ def build_holiday_list(year: int, title=None, confirm_past=False, martial_law_co
 			frappe.throw(
 				_("Перебудова змінює {0} минулих дат у календарі {1}. Потрібне явне підтвердження").format(
 					len(touched_past), title
-				)
+				),
+				PastDatesChange,
 			)
 		doc.set("holidays", [])
 	else:
@@ -129,12 +134,40 @@ def build_holiday_list(year: int, title=None, confirm_past=False, martial_law_co
 		)
 	doc.save(ignore_permissions=True)
 
-	return {
+	summary = {
 		"title": title,
 		"total": len(entries),
 		"martial_law": martial_law,
 		"holidays": len([e for e in entries if e[1] != _("Вихідний день")]),
+		"past_changed": len(touched_past) if existing else 0,
 	}
+	# Кожна побудова — у журналі; підтверджена зміна минулих дат названа окремо (FR-046).
+	from ua_compliance import journal
+
+	message = _("{0}: днів відпочинку {1}, з них свят {2}{3}").format(
+		title,
+		summary["total"],
+		summary["holidays"],
+		_(", воєнний стан — свята не вихідні") if martial_law else "",
+	)
+	if summary["past_changed"]:
+		message += _("; підтверджено зміну минулих дат: {0}").format(summary["past_changed"])
+	journal.write("Перебудова календаря", "Успішно", message, counts={"created": summary["total"]})
+	return summary
+
+
+def build_next_year():
+	"""Щорічне завдання: календар наступного року будується заздалегідь, у грудні.
+
+	Наступний рік — лише майбутні дати, тож підтвердження не потрібне; поточний рік
+	перебудовує людина кнопкою, бо там можуть змінитися минулі дати.
+	"""
+	try:
+		return build_holiday_list(getdate(today()).year + 1)
+	except Exception as error:
+		from ua_compliance import journal
+
+		journal.write("Перебудова календаря", "Помилка", str(error))
 
 
 def working_time(year: int, hours_per_day=8.0, title=None):

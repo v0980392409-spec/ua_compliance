@@ -25,5 +25,7 @@ scheduler_events = {
 		"0 8 * * *": ["ua_compliance.packages.jobs.poll_packages"],
 		# Раз на добу — попередження про давність оновлень і прострочені пакети.
 		"15 8 * * *": ["ua_compliance.packages.jobs.warn_about_updates"],
+		# Щороку 1 грудня — календар наступного року (лише майбутні дати).
+		"0 6 1 12 *": ["ua_compliance.calendar.build.build_next_year"],
 	}
 }
