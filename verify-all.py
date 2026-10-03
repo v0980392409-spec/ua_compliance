@@ -319,6 +319,17 @@ from tests.fixtures.build_package import PARAMETERS_CSV, build_package, generate
 from ua_compliance.packages import keys as keys_module
 from ua_compliance.ua_compliance.doctype.ua_update_package.ua_update_package import receive
 
+# Версії тестових пакетів — в окремому діапазоні, вищому за будь-яку справжню (РРРРММДД):
+# інакше застосований на стенді справжній пакет робить тестові «не новішими» (спіймано
+# 03.10.2026, коли застосували parameters-20261003). Взаємний порядок зберігається, а
+# прибирання наприкінці видаляє тестові пакети, тож справжня лінія версій не засмічується.
+TEST_VERSION_BASE = 900_000_000
+
+
+def V(n):
+	return TEST_VERSION_BASE + (n - 20261000)
+
+
 key_a, private_a, id_a = generate_key()
 key_b, private_b, id_b = generate_key()
 key_c, private_c, id_c = generate_key()
@@ -327,7 +338,7 @@ _production_keys = list(keys_module.TRUSTED_KEYS)
 keys_module.TRUSTED_KEYS[:] = [key_a, key_b, key_c]  # лише для перевірки: бойові ключі приїжджають релізом
 
 
-def take(raw, version=20261002):
+def take(raw, version=V(20261002)):
 	package = receive(raw, "parameters", version)
 	ok = package.run_verification(raw)
 	return package, ok
@@ -335,7 +346,7 @@ def take(raw, version=20261002):
 
 try:
 	# 9.1 Повний шлях: прийняття → перевірка → передпоказ → затвердження → застосування
-	good = build_package(PARAMETERS_CSV, keys=SIGNERS, version=20261002)
+	good = build_package(PARAMETERS_CSV, keys=SIGNERS, version=V(20261002))
 	package, ok = take(good)
 	chk(
 		"пакет із двома підписами проходить перевірку",
@@ -378,32 +389,32 @@ try:
 	package.reload()
 
 	# 9.2 Чотири зіпсованих пакети
-	one_signature = build_package(PARAMETERS_CSV, keys=[SIGNERS[0]], version=20261003)
-	package_one, ok_one = take(one_signature, version=20261003)
+	one_signature = build_package(PARAMETERS_CSV, keys=[SIGNERS[0]], version=V(20261003))
+	package_one, ok_one = take(one_signature, version=V(20261003))
 	chk(
 		"один підпис замість двох — відмова (FR-024)",
 		not ok_one and "підписів 1, потрібно 2" in (package_one.reject_reason or ""),
 		package_one.reject_reason,
 	)
 
-	old_version = build_package(PARAMETERS_CSV, keys=SIGNERS, version=20261001)
-	package_old, ok_old = take(old_version, version=20261001)
+	old_version = build_package(PARAMETERS_CSV, keys=SIGNERS, version=V(20261001))
+	package_old, ok_old = take(old_version, version=V(20261001))
 	chk(
 		"версія не новіша за застосовану — відмова (FR-025)",
 		not ok_old and "не новіша" in (package_old.reject_reason or ""),
 		package_old.reject_reason,
 	)
 
-	expired = build_package(PARAMETERS_CSV, keys=SIGNERS, version=20261004, expires="2020-01-01")
-	package_expired, ok_expired = take(expired, version=20261004)
+	expired = build_package(PARAMETERS_CSV, keys=SIGNERS, version=V(20261004), expires="2020-01-01")
+	package_expired, ok_expired = take(expired, version=V(20261004))
 	chk(
 		"строк придатності минув — відмова (FR-026)",
 		not ok_expired and "строк придатності" in (package_expired.reject_reason or ""),
 		package_expired.reject_reason,
 	)
 
-	bad_hash = build_package(PARAMETERS_CSV, keys=SIGNERS, version=20261005, corrupt_hash=True)
-	package_hash, ok_hash = take(bad_hash, version=20261005)
+	bad_hash = build_package(PARAMETERS_CSV, keys=SIGNERS, version=V(20261005), corrupt_hash=True)
+	package_hash, ok_hash = take(bad_hash, version=V(20261005))
 	chk(
 		"хеш файла не збігається — відмова (FR-027)",
 		not ok_hash and "не відповідає хешу" in (package_hash.reject_reason or ""),
@@ -412,17 +423,17 @@ try:
 
 	# 9.3 Виконуваний вміст і стара версія застосунку
 	executable = build_package(
-		PARAMETERS_CSV, keys=SIGNERS, version=20261006, extra_file=("evil.py", b"import os")
+		PARAMETERS_CSV, keys=SIGNERS, version=V(20261006), extra_file=("evil.py", b"import os")
 	)
-	package_exec, ok_exec = take(executable, version=20261006)
+	package_exec, ok_exec = take(executable, version=V(20261006))
 	chk(
 		"файл, що не є даними, робить пакет неприйнятним (FR-034)",
 		not ok_exec and "не є файлом даних" in (package_exec.reject_reason or ""),
 		package_exec.reject_reason,
 	)
 
-	too_new = build_package(PARAMETERS_CSV, keys=SIGNERS, version=20261007, min_app_version="99.0.0")
-	package_new, ok_new = take(too_new, version=20261007)
+	too_new = build_package(PARAMETERS_CSV, keys=SIGNERS, version=V(20261007), min_app_version="99.0.0")
+	package_new, ok_new = take(too_new, version=V(20261007))
 	chk(
 		"пакет для новішої версії застосунку — відмова (FR-052)",
 		not ok_new and "версія застосунку не нижче" in (package_new.reject_reason or ""),
@@ -432,8 +443,8 @@ try:
 	# 9.4 Розходження з ручним записом
 	make_param("2027-01-01", 9000, code="TEST_PKG_MIN_WAGE_MANUAL")
 	manual_csv = PARAMETERS_CSV.replace("TEST_PKG_MIN_WAGE", "TEST_PKG_MIN_WAGE_MANUAL")
-	conflicting = build_package(manual_csv, keys=SIGNERS, version=20261008)
-	package_conflict, ok_conflict = take(conflicting, version=20261008)
+	conflicting = build_package(manual_csv, keys=SIGNERS, version=V(20261008))
+	package_conflict, ok_conflict = take(conflicting, version=V(20261008))
 	conflict_rows = [row for row in package_conflict.preview if row.conflict]
 	chk(
 		"розходження з ручним записом виділено в передпоказі (FR-032)",
@@ -453,9 +464,9 @@ try:
 	# пакет запізнився й привіз те, що вже ввели). У базі 9546.0, у пакеті 9546.
 	make_param("2027-01-01", 9546, code="TEST_PKG_SAME_VALUE")
 	same_value = build_package(
-		PARAMETERS_CSV.replace("TEST_PKG_MIN_WAGE", "TEST_PKG_SAME_VALUE"), keys=SIGNERS, version=20261015
+		PARAMETERS_CSV.replace("TEST_PKG_MIN_WAGE", "TEST_PKG_SAME_VALUE"), keys=SIGNERS, version=V(20261015)
 	)
-	package_same, ok_same = take(same_value, version=20261015)
+	package_same, ok_same = take(same_value, version=V(20261015))
 	same_rows = [(r.action, r.conflict) for r in package_same.preview if r.code == "TEST_PKG_SAME_VALUE"]
 	chk(
 		"те саме значення, що введене вручну, не є розходженням (FR-032)",
@@ -463,11 +474,35 @@ try:
 		str(same_rows),
 	)
 
+	# 9.4б Стан і передпоказ пише лише сервер у діях пакета (спіймано на демо 03.10.2026)
+	package_same.reload()
+	package_same.state = "Застосовано"
+	try:
+		package_same.save(ignore_permissions=True)
+		chk("стан пакета не виставляється руками", False, "збереглося")
+	except frappe.ValidationError as error:
+		chk("стан пакета не виставляється руками", "лише діями" in str(error), str(error)[:80])
+	package_same.reload()
+	package_same.preview[0].conflict = 1 - package_same.preview[0].conflict
+	try:
+		package_same.save(ignore_permissions=True)
+		chk("передпоказ пакета не правиться руками", False, "збереглося")
+	except frappe.ValidationError as error:
+		chk("передпоказ пакета не правиться руками", "лише діями" in str(error), str(error)[:80])
+	forged = frappe.get_doc(
+		{"doctype": "UA Update Package", "channel": "Параметри", "version": "підробка", "state": "Застосовано"}
+	).insert(ignore_permissions=True)
+	chk(
+		"новий пакет народжується лише отриманим",
+		frappe.db.get_value("UA Update Package", forged.name, "state") == "Отримано",
+		frappe.db.get_value("UA Update Package", forged.name, "state"),
+	)
+
 	# 9.5 Той самий пакет файлом (ізольований контур) і кнопки форми
 	offline = build_package(
-		PARAMETERS_CSV.replace("TEST_PKG_MIN_WAGE", "TEST_PKG_OFFLINE"), keys=SIGNERS, version=20261009
+		PARAMETERS_CSV.replace("TEST_PKG_MIN_WAGE", "TEST_PKG_OFFLINE"), keys=SIGNERS, version=V(20261009)
 	)
-	package_offline = receive(offline, "parameters", 20261009)
+	package_offline = receive(offline, "parameters", V(20261009))
 	attachment = frappe.get_doc(
 		{
 			"doctype": "File",
@@ -495,12 +530,12 @@ try:
 
 	# 9.6 Попередження про прострочений пакет (FR-038)
 	stale = build_package(
-		PARAMETERS_CSV.replace("TEST_PKG_MIN_WAGE", "TEST_PKG_STALE"), keys=SIGNERS, version=20261010
+		PARAMETERS_CSV.replace("TEST_PKG_MIN_WAGE", "TEST_PKG_STALE"), keys=SIGNERS, version=V(20261010)
 	)
-	package_stale = receive(stale, "parameters", 20261010)
+	package_stale = receive(stale, "parameters", V(20261010))
 	package_stale.state = "До застосування"
 	package_stale.expires_on = "2020-01-01"
-	package_stale.save(ignore_permissions=True)
+	package_stale.save_by_action()  # підготовка перевірки, а не дія користувача
 	from ua_compliance.packages.jobs import warn_about_updates
 
 	warnings = warn_about_updates()
@@ -515,10 +550,10 @@ try:
 	from ua_compliance.packages.jobs import poll_packages
 
 	feed_good = build_package(
-		PARAMETERS_CSV.replace("TEST_PKG_MIN_WAGE", "TEST_PKG_FEED"), keys=SIGNERS, version=20261020
+		PARAMETERS_CSV.replace("TEST_PKG_MIN_WAGE", "TEST_PKG_FEED"), keys=SIGNERS, version=V(20261020)
 	)
 	feed_bad = build_package(
-		PARAMETERS_CSV.replace("TEST_PKG_MIN_WAGE", "TEST_PKG_FEED_BAD"), keys=SIGNERS[:1], version=20261021
+		PARAMETERS_CSV.replace("TEST_PKG_MIN_WAGE", "TEST_PKG_FEED_BAD"), keys=SIGNERS[:1], version=V(20261021)
 	)
 	feed_files = {"https://feed.test/20261021/bad.zip": feed_bad, "https://feed.test/20261020/good.zip": feed_good}
 	feed_releases = [
@@ -602,11 +637,11 @@ try:
 
 	# 9.8 Ручне заведення з форми: людина обирає лише канал
 	manual = build_package(
-		PARAMETERS_CSV.replace("TEST_PKG_MIN_WAGE", "TEST_PKG_MANUAL"), keys=SIGNERS, version=20261022
+		PARAMETERS_CSV.replace("TEST_PKG_MIN_WAGE", "TEST_PKG_MANUAL"), keys=SIGNERS, version=V(20261022)
 	)
 	results_manual = {}
 	for title in ("Параметри", "Класифікатори"):
-		doc = frappe.get_doc({"doctype": "UA Update Package", "channel": title, "version": "20261022", "state": "Отримано"})
+		doc = frappe.get_doc({"doctype": "UA Update Package", "channel": title, "version": str(V(20261022)), "state": "Отримано"})
 		doc.insert(ignore_permissions=True)
 		doc.run_verification(manual)
 		results_manual[title] = frappe.db.get_value(
@@ -817,9 +852,9 @@ CLASSIFIER_CSV = """classifier,code,entry_name,parent_code,level,valid_from,vali
 keys_module.TRUSTED_KEYS[:] = [key_a, key_b, key_c]
 try:
 	classifier_package = build_package(
-		CLASSIFIER_CSV, channel="classifiers", keys=SIGNERS, version=20261101
+		CLASSIFIER_CSV, channel="classifiers", keys=SIGNERS, version=V(20261101)
 	)
-	package_classifier = receive(classifier_package, "classifiers", 20261101)
+	package_classifier = receive(classifier_package, "classifiers", V(20261101))
 	ok_classifier = package_classifier.run_verification(classifier_package)
 	chk(
 		"пакет класифікатора проходить перевірку",
@@ -862,8 +897,8 @@ try:
 		"КАТОТТГ,UA00000000000000003,Тестова громада,UA00000000000000002,3,2021-01-01,",
 		"КАТОТТГ,UA00000000000000003,Тестова громада,UA00000000000000002,3,2021-01-01,2026-09-30",
 	)
-	closing_package = build_package(closing_csv, channel="classifiers", keys=SIGNERS, version=20261102)
-	package_closing = receive(closing_package, "classifiers", 20261102)
+	closing_package = build_package(closing_csv, channel="classifiers", keys=SIGNERS, version=V(20261102))
+	package_closing = receive(closing_package, "classifiers", V(20261102))
 	package_closing.run_verification(closing_package)
 	package_closing.approve_and_apply(closing_package)
 	chk(
@@ -886,8 +921,8 @@ try:
 		f"КАТОТТГ,UA9{number:018d},Тестовий запис {number},,4,2021-01-01," for number in range(32000)
 	)
 	bulk_csv = "classifier,code,entry_name,parent_code,level,valid_from,valid_to\n" + bulk_rows + "\n"
-	bulk_package = build_package(bulk_csv, channel="classifiers", keys=SIGNERS, version=20261103)
-	package_bulk = receive(bulk_package, "classifiers", 20261103)
+	bulk_package = build_package(bulk_csv, channel="classifiers", keys=SIGNERS, version=V(20261103))
+	package_bulk = receive(bulk_package, "classifiers", V(20261103))
 	started_bulk = _time.time()
 	package_bulk.run_verification(bulk_package)
 	package_bulk.approve_and_apply(bulk_package)

@@ -36,6 +36,8 @@ class UAUpdatePackage(Document):
 	def before_insert(self):
 		# Ім'я складається з коду каналу, а присвоюється раніше за validate.
 		self._set_channel_code()
+		# Пакет народжується лише отриманим, що б не надіслали у формі чи через API.
+		self.state = "Отримано"
 
 	def validate(self):
 		self._set_channel_code()
@@ -47,8 +49,25 @@ class UAUpdatePackage(Document):
 				frappe.throw(
 					_("Застосований пакет не скасовується — виправлення приходить наступним пакетом")
 				)
+			if not self.flags.ua_action:
+				# Стан і передпоказ пише лише сервер у діях пакета. Інакше «Застосовано»
+				# виставлялося б руками без застосування (і обманювало захист від відкоту),
+				# а знятий прапорець «Розходиться» обходив би блокування затвердження.
+				frappe.throw(
+					_("Пакет змінюється лише діями «Перевірити», «Затвердити», «Відхилити»")
+				)
 		if self.state == "Відхилено" and not self.reject_reason:
 			frappe.throw(_("Вкажіть причину відхилення"))
+
+	def save_by_action(self):
+		"""Збереження з дії пакета. Дозвіл одноразовий: після збереження прапорець
+		знімається, інакше наступне ручне збереження того самого об'єкта пройшло б
+		(спіймано харнесом 03.10.2026)."""
+		self.flags.ua_action = True
+		try:
+			self.save(ignore_permissions=True)
+		finally:
+			self.flags.ua_action = False
 
 	def on_trash(self):
 		frappe.throw(_("Пакет оновлень не видаляється — він є слідом рішення"))
@@ -76,7 +95,7 @@ class UAUpdatePackage(Document):
 		except PackageError as error:
 			self.state = "Відхилено"
 			self.reject_reason = str(error)
-			self.save(ignore_permissions=True)
+			self.save_by_action()
 			journal.write("Приймання пакета", "Помилка", str(error), package=self.name, started_at=started)
 			return False
 
@@ -100,7 +119,7 @@ class UAUpdatePackage(Document):
 				"\nЗмін усього: {0}, у передпоказі показано перші {1}"
 			).format(total, len(shown))
 		self.state = "До застосування"
-		self.save(ignore_permissions=True)
+		self.save_by_action()
 		journal.write(
 			"Приймання пакета",
 			"Успішно",
@@ -138,7 +157,7 @@ class UAUpdatePackage(Document):
 		self.approved_by = frappe.session.user
 		self.approved_on = now_datetime()
 		self.applied_on = now_datetime()
-		self.save(ignore_permissions=True)
+		self.save_by_action()
 		journal.write(
 			"Застосування пакета",
 			"Успішно",

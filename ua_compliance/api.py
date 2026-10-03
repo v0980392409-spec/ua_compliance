@@ -89,7 +89,7 @@ def reject_package(name, reason):
 	package = frappe.get_doc("UA Update Package", name)
 	package.state = "Відхилено"
 	package.reject_reason = reason
-	package.save(ignore_permissions=True)
+	package.save_by_action()
 	from ua_compliance import journal
 
 	journal.write("Приймання пакета", "Помилка", f"Відхилено вручну: {reason}", package=package.name)
