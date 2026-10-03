@@ -7,9 +7,13 @@
 Формат — відкритий ключ minisign (рядок base64 без коментаря).
 """
 
-# Поки ключі не випущені, канал даних закритий: пакет не прийметься.
-# Перший реліз із ключами відкриє його.
-TRUSTED_KEYS: list[str] = []
+# Випущені 03.10.2026; секретні частини — на трьох окремих носіях мейнтейнера.
+# Ідентифікатор ключа в коментарі — як його друкує minisign.
+TRUSTED_KEYS: list[str] = [
+	"RWRtZNh1PRywk/8JH0cpKZcCqmEmgqL4HXex3fyQeUGkWGHVKbg+HXit",  # 1: 93B01C3D75D8646D
+	"RWQ6q2gR8wY07+5GjC9pVuAYLeSCYGTq2s/vhSredqp9Kx+Hxyreirs7",  # 2: EF3406F31168AB3A
+	"RWQhF6Nto+340OTY2yWxxhZjXkuAvGxI3yQ+wHlcYg+GGRBnimiFHuR5",  # 3: D0F8EDA36DA31721
+]
 
 # Скільки різних ключів мають підписати маніфест.
 THRESHOLD = 2

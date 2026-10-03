@@ -1,6 +1,6 @@
 [project]
 name = "ua_compliance"
-version = "0.0.1"
+dynamic = ["version"]
 description = "Ukrainian legal layer for ERPNext/Frappe: NBU rates, effective-dated legal parameters, signed update channel"
 readme = "README.md"
 license = { text = "GPL-3.0-or-later" }

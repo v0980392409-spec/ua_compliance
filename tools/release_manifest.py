@@ -33,7 +33,12 @@ def app_version():
 
 
 def tag_commit(tag):
-	return subprocess.check_output(["git", "rev-list", "-n", "1", tag], cwd=ROOT, text=True).strip()
+	try:
+		return subprocess.check_output(
+			["git", "rev-list", "-n", "1", tag], cwd=ROOT, text=True, stderr=subprocess.DEVNULL
+		).strip()
+	except subprocess.CalledProcessError:
+		raise SystemExit(f"Тега {tag} у цій копії репозиторію немає (git fetch --tags?)") from None
 
 
 def build(tag):
