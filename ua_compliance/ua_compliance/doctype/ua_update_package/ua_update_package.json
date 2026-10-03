@@ -162,7 +162,8 @@
    "fieldtype": "Link",
    "label": "\u0417\u0430\u0442\u0432\u0435\u0440\u0434\u0438\u0432",
    "options": "User",
-   "read_only": 1
+   "read_only": 1,
+   "in_list_view": 1
   },
   {
    "fieldname": "col_result",
@@ -178,13 +179,14 @@
    "fieldname": "applied_on",
    "fieldtype": "Datetime",
    "label": "\u0417\u0430\u0441\u0442\u043e\u0441\u043e\u0432\u0430\u043d\u043e",
-   "read_only": 1
+   "read_only": 1,
+   "in_list_view": 1
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-10-02 23:31:22.000000",
+ "modified": "2026-10-03 21:21:10.000000",
  "modified_by": "Administrator",
  "module": "UA Compliance",
  "name": "UA Update Package",
