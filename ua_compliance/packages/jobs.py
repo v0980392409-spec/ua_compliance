@@ -106,7 +106,13 @@ def warn_about_updates():
 
 	expired = frappe.get_all(
 		"UA Update Package",
-		filters={"state": ["in", ["Отримано", "До застосування"]], "expires_on": ["<", today()]},
+		# Frappe підставляє замість порожньої дати 0001-01-01: без «is set» пакет без строку
+		# (щойно заведений, ще не перевірений) вважався б простроченим.
+		filters=[
+			["state", "in", ["Отримано", "До застосування"]],
+			["expires_on", "is", "set"],
+			["expires_on", "<", today()],
+		],
 		pluck="name",
 	)
 	for name in expired:
@@ -123,5 +129,7 @@ def warn_about_updates():
 			warnings.append(f"Є непримінений пакет {name}, дата дії якого вже настала")
 
 	if warnings:
-		journal.write("Приймання пакета", "Помилка", "\n".join(warnings))
+		# Попередження — не збій приймання: свій вид і результат «Увага», щоб журнал не
+		# лякав щоденною «Помилкою» там, де нічого не зламалося.
+		journal.write("Попередження", "Увага", "\n".join(warnings))
 	return warnings

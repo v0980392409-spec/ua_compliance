@@ -420,6 +420,12 @@ try:
 		not ok_hash and "не відповідає хешу" in (package_hash.reject_reason or ""),
 		package_hash.reject_reason,
 	)
+	stored_hash = frappe.db.get_value("UA Update Package", package_hash.name, ["signatures_ok", "key_ids"], as_dict=True)
+	chk(
+		"відхилений за хешем пакет показує справжні підписи з номерами ключів",
+		stored_hash.signatures_ok == 2 and (stored_hash.key_ids or "").count("ключ ") == 2,
+		str(stored_hash),
+	)
 
 	# 9.3 Виконуваний вміст і стара версія застосунку
 	executable = build_package(
@@ -446,6 +452,11 @@ try:
 	conflicting = build_package(manual_csv, keys=SIGNERS, version=V(20261008))
 	package_conflict, ok_conflict = take(conflicting, version=V(20261008))
 	conflict_rows = [row for row in package_conflict.preview if row.conflict]
+	chk(
+		"прежнє значення в передпоказі — як у законі, без «.0»",
+		[r.old_value for r in conflict_rows] == ["9000"],
+		str([r.old_value for r in conflict_rows]),
+	)
 	chk(
 		"розходження з ручним записом виділено в передпоказі (FR-032)",
 		ok_conflict and bool(conflict_rows),
@@ -539,10 +550,21 @@ try:
 	from ua_compliance.packages.jobs import warn_about_updates
 
 	warnings = warn_about_updates()
+	# Читаємо збережений журнал, а не повернуте значення
+	warning_rows = frappe.get_all(
+		"UA Operation Log",
+		filters={"kind": "Попередження", "result": "Увага", "message": ["like", "%Строк придатності%"]},
+		pluck="message",
+	)
 	chk(
-		"попередження про прострочений пакет потрапляє в журнал (FR-038)",
-		any("Строк придатності" in w for w in (warnings or [])),
+		"попередження про прострочений пакет — у журналі окремим видом (FR-038)",
+		bool(warning_rows),
 		"; ".join(warnings or [])[:120],
+	)
+	chk(
+		"пакет без строку придатності не названо простроченим",
+		not any("підробка" in w for w in (warnings or [])),
+		"; ".join(w for w in (warnings or []) if "підробка" in w),
 	)
 
 	# 9.7 Забір з каналу роздачі (FR-039): канал підмінено, решта шляху — справжня
@@ -1001,6 +1023,17 @@ untranslated = [n for n in _names if frappe._(n) == n]
 frappe.local.lang = _lang
 frappe.local.lang_full_dict = None
 chk("доктайпи й звіти застосунку мають український підпис", not untranslated, ", ".join(untranslated) or f"{len(_names)} назв")
+
+icon = frappe.db.get_value("Desktop Icon", "Законодавство", ["link_type", "link_to", "icon"], as_dict=True)
+chk(
+	"плитка розділу веде на його бокову панель і має значок",
+	bool(icon) and icon.link_type == "Workspace Sidebar" and icon.link_to == "Законодавство" and bool(icon.icon),
+	str(icon),
+)
+chk(
+	"у списку курсів немає колонки «У валюту» — вона завжди гривня",
+	not frappe.get_meta("Currency Exchange").get_field("to_currency").in_list_view,
+)
 
 # 12б. Розклад курсу живе в налаштуваннях: такт звіряє час і не дублює запуск
 from datetime import datetime as _dt

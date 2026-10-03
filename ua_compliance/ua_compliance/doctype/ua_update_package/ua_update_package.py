@@ -87,6 +87,16 @@ class UAUpdatePackage(Document):
 			)
 		return result
 
+	def _fill_header(self, result):
+		"""Шапка пакета з маніфесту: підписи, строки, опис."""
+		manifest = result["manifest"]
+		self.manifest_hash = result["manifest_hash"]
+		self.key_ids = package_verify.describe_keys(result["key_ids"])
+		self.signatures_ok = len(result["key_ids"])
+		self.expires_on = manifest.get("expires")
+		self.min_app_version = manifest.get("min_app_version")
+		self.notes = manifest.get("notes")
+
 	def run_verification(self, raw):
 		"""Перевірка за контрактом. Будь-яка невдача — стан «Відхилено» з причиною."""
 		started = now_datetime()
@@ -95,17 +105,14 @@ class UAUpdatePackage(Document):
 		except PackageError as error:
 			self.state = "Відхилено"
 			self.reject_reason = str(error)
+			seen = package_verify.inspect_signatures(raw)
+			if seen:
+				self._fill_header(seen)
 			self.save_by_action()
 			journal.write("Приймання пакета", "Помилка", str(error), package=self.name, started_at=started)
 			return False
 
-		manifest = result["manifest"]
-		self.manifest_hash = result["manifest_hash"]
-		self.key_ids = ", ".join(result["key_ids"])
-		self.signatures_ok = len(result["key_ids"])
-		self.expires_on = manifest.get("expires")
-		self.min_app_version = manifest.get("min_app_version")
-		self.notes = manifest.get("notes")
+		self._fill_header(result)
 		self.set("files", [])
 		for row in result["files"]:
 			self.append("files", row)

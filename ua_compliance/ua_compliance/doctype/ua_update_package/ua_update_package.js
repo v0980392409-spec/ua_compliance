@@ -3,6 +3,9 @@
 frappe.ui.form.on("UA Update Package", {
 	refresh(frm) {
 		if (frm.is_new()) return;
+		// Збережений пакет змінюють лише дії нижче; кнопка «Зберегти» тут нічого не дала б,
+		// крім відмови сервера.
+		frm.disable_save();
 
 		if (["Отримано", "Відхилено"].includes(frm.doc.state)) {
 			frm.add_custom_button(__("Перевірити"), () =>

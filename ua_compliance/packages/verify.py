@@ -4,6 +4,8 @@
 Кожна відмова лишає запис у журналі: мовчазних відмов не буває.
 """
 
+import base64
+
 import frappe
 from frappe.utils import getdate, today
 
@@ -14,6 +16,40 @@ from ua_compliance.packages.reader import PackageError, open_package, sha256
 from ua_compliance.packages.signature import SignatureError, verify_detached
 
 MANIFEST_TYPE = "ua-compliance-package"
+
+
+def describe_keys(key_ids):
+	"""«ключ 2 (EF3406F31168AB3A), …» — номер у переліку довірених і ідентифікатор так,
+	як його друкує minisign (байти навпаки, hex). Base64 людина не звірить із носієм."""
+	from ua_compliance.packages.signature import _decode_public_key
+
+	numbers = {_decode_public_key(k)[1]: n for n, k in enumerate(keys_module.trusted_keys(), 1)}
+	described = []
+	for key_id in key_ids:
+		raw_id = base64.b64decode(key_id)
+		minisign_id = raw_id[::-1].hex().upper()
+		number = numbers.get(raw_id)
+		described.append(f"ключ {number} ({minisign_id})" if number else minisign_id)
+	return ", ".join(described)
+
+
+def inspect_signatures(raw: bytes):
+	"""Що вдалося встановити про підписи, навіть коли пакет відхилено далі.
+
+	Відмова за хешем при двох справжніх підписах не має показувати «підписів 0»:
+	людина має бачити, що зупинило пакет, а що пройшло. Ніколи не кидає виняток.
+	"""
+	try:
+		manifest, manifest_bytes, signatures, _data = open_package(raw)
+	except Exception:
+		return None
+	key_ids = set()
+	for signature_text in signatures:
+		try:
+			key_ids.add(verify_detached(manifest_bytes, signature_text, keys_module.trusted_keys()))
+		except Exception:
+			continue
+	return {"manifest": manifest, "manifest_hash": sha256(manifest_bytes), "key_ids": sorted(key_ids)}
 
 
 def verify(raw: bytes, last_applied_version=None):

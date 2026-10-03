@@ -102,7 +102,12 @@ def _as_text(record):
 		"Ознака": "value_flag",
 	}[record.value_type]
 	value = record.get(field)
-	return "" if value is None else str(value)
+	if value is None:
+		return ""
+	if field == "value_number":
+		# 8647.0 із бази показуємо як 8647: так значення стоїть у законі й у пакеті.
+		return f"{value:g}" if float(value) != int(float(value)) else str(int(float(value)))
+	return str(value)
 
 
 def build_classifiers(rows):

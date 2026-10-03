@@ -54,6 +54,14 @@ def setup_fields():
 	create_custom_fields(CURRENCY_EXCHANGE_FIELDS, ignore_validate=True)
 	# Список курсів — за датою, новіші вгорі (контракт екранів, екран 1): так їх
 	# дивляться в as-is регістрі «Курси валют», а штатно список іде за ідентифікатором.
+	# «У валюту» в обліку завжди гривня — колонка в списку нічого не каже.
+	if frappe.db.get_value(
+		"Property Setter", {"doc_type": "Currency Exchange", "field_name": "to_currency", "property": "in_list_view"}, "value"
+	) != "0":
+		frappe.make_property_setter(
+			{"doctype": "Currency Exchange", "fieldname": "to_currency", "property": "in_list_view", "value": "0", "property_type": "Check"},
+			validate_fields_for_doctype=False,
+		)
 	for prop, value in (("sort_field", "date"), ("sort_order", "DESC")):
 		if frappe.db.get_value(
 			"Property Setter", {"doc_type": "Currency Exchange", "doctype_or_field": "DocType", "property": prop}, "value"
