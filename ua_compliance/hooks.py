@@ -19,8 +19,8 @@ after_migrate = "ua_compliance.setup.install.after_migrate"
 # встановлений джерелом на завтра (воно встановлює його після 15:30).
 scheduler_events = {
 	"cron": {
-		"0 7 * * *": ["ua_compliance.rates.job.scheduled_load_rates"],
-		"30 17 * * *": ["ua_compliance.rates.job.scheduled_load_rates"],
+		# Такт курсу: самі часи запусків — у налаштуваннях, задання їх лише звіряє.
+		"*/15 * * * *": ["ua_compliance.rates.job.scheduled_tick"],
 		# Раз на добу — забір пакетів з каналу роздачі; до попередження, щоб воно бачило свіже.
 		"0 8 * * *": ["ua_compliance.packages.jobs.poll_packages"],
 		# Раз на добу — попередження про давність оновлень і прострочені пакети.

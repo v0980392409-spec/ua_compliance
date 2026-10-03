@@ -5,8 +5,10 @@
 про власний успіх (урок фічі 019).
 """
 
+from datetime import datetime, timedelta
+
 import frappe
-from frappe.utils import add_days, getdate, now_datetime
+from frappe.utils import add_days, get_time, getdate, now_datetime
 
 from ua_compliance.rates import parse as rates_parse
 from ua_compliance.rates import source as rates_source
@@ -130,9 +132,36 @@ def _write_log(summary, started, triggered_by):
 	).insert(ignore_permissions=True)
 
 
-def scheduled_load_rates():
-	"""Точка входу розкладу. Вимикач — у налаштуваннях."""
+# Вікно, у якому запуск ще вважається «вчасним»: такт планувальника — 15 хвилин,
+# тож у вікно потрапляють два такти, і запізнення одного не губить запуск.
+SLOT_WINDOW = timedelta(minutes=30)
+
+
+def due_slot(settings, now):
+	"""Час запуску з налаштувань, вікно якого триває зараз, або None."""
+	for value in (settings.rates_morning_time, settings.rates_evening_time):
+		if not value:
+			continue
+		slot = datetime.combine(now.date(), get_time(value))
+		if slot <= now < slot + SLOT_WINDOW:
+			return slot
+	return None
+
+
+def scheduled_tick():
+	"""Такт розкладу: запускає завантаження в часи з налаштувань.
+
+	Розклад живе в налаштуваннях, а не в коді (data-model, «Налаштування»): дві
+	cron-записи в hooks на одну функцію платформа зводить до однієї — так ранковий
+	запуск мовчки зник (спіймано на демо 03.10.2026). Повторно в тому самому вікні не
+	запускає: дивиться в журнал.
+	"""
 	settings = frappe.get_single("UA Compliance Settings")
 	if not settings.rates_enabled:
-		return
-	load_rates(triggered_by="Administrator")
+		return None
+	slot = due_slot(settings, now_datetime())
+	if slot is None:
+		return None
+	if frappe.db.exists("UA Operation Log", {"kind": "Завантаження курсу", "started_at": [">=", slot]}):
+		return None
+	return load_rates(triggered_by="Administrator")

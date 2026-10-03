@@ -937,6 +937,68 @@ sidebar_dangling = [
 ]
 chk("усі посилання бокової панелі ведуть на наявні екрани", not sidebar_dangling, ", ".join(sidebar_dangling))
 
+# 12а-2. Список курсів за контрактом екранів (екран 1)
+ce_meta = frappe.get_meta("Currency Exchange")
+chk(
+	"список курсів: за датою, новіші вгорі, з кратністю й джерелом",
+	ce_meta.sort_field == "date"
+	and ce_meta.sort_order == "DESC"
+	and all(ce_meta.get_field(f).in_list_view for f in ("ua_multiplicity", "ua_source")),
+	f"{ce_meta.sort_field} {ce_meta.sort_order}",
+)
+
+log_meta = frappe.get_meta("UA Operation Log")
+chk(
+	"журнал операцій: колонки й фільтри з контракту екранів (екран 7)",
+	all(log_meta.get_field(f).in_list_view for f in ("kind", "started_at", "result", "checked_count", "created_count", "updated_count", "message"))
+	and all(log_meta.get_field(f).in_standard_filter for f in ("kind", "result")),
+)
+
+# 12б. Розклад курсу живе в налаштуваннях: такт звіряє час і не дублює запуск
+from datetime import datetime as _dt
+from datetime import timedelta as _td
+
+from ua_compliance import journal as _journal
+from ua_compliance.rates import job as rates_job
+
+_settings_rows = frappe.db.sql("select field, value from tabSingles where doctype=%s order by field", "UA Compliance Settings")
+_load_rates = rates_job.load_rates
+_now = frappe.utils.now_datetime().replace(microsecond=0)
+try:
+	# Вікно відкривається зараз: завантаження курсу, які харнес зробив на початку
+	# прогону, лишаються до вікна й не маскують такт.
+	slot_time = _now.time()
+	frappe.db.set_single_value(
+		"UA Compliance Settings",
+		{"rates_enabled": 1, "rates_morning_time": str(slot_time), "rates_evening_time": "23:59:00"},
+	)
+	settings_now = frappe.get_single("UA Compliance Settings")
+	chk(
+		"вікно запуску рахується від часу з налаштувань",
+		rates_job.due_slot(settings_now, _now) == _dt.combine(_now.date(), slot_time)
+		and rates_job.due_slot(settings_now, _now + _td(hours=2)) is None,
+		str(rates_job.due_slot(settings_now, _now)),
+	)
+	# Завантаження підмінене: курс не чіпаємо, рахуємо лише, скільки разів такт його запустив
+	rates_job.load_rates = lambda **kwargs: _journal.write("Завантаження курсу", "Успішно", "перевірка такту")
+	before_ticks = frappe.db.count("UA Operation Log", {"message": "перевірка такту"})
+	rates_job.scheduled_tick()
+	rates_job.scheduled_tick()
+	chk(
+		"у вікні такт запускає завантаження один раз, а не двічі",
+		frappe.db.count("UA Operation Log", {"message": "перевірка такту"}) == before_ticks + 1,
+	)
+finally:
+	rates_job.load_rates = _load_rates
+	frappe.db.delete("Singles", {"doctype": "UA Compliance Settings"})
+	for field, value in _settings_rows:
+		frappe.db.sql(
+			"insert into tabSingles (doctype, field, value) values (%s, %s, %s)", ("UA Compliance Settings", field, value)
+		)
+	frappe.clear_document_cache("UA Compliance Settings", "UA Compliance Settings")
+rate_jobs = frappe.get_all("Scheduled Job Type", filters={"method": ["like", "ua_compliance.rates.%"]}, pluck="method")
+chk("у розкладі одне завдання курсу — такт", rate_jobs == ["ua_compliance.rates.job.scheduled_tick"], ", ".join(rate_jobs))
+
 # 13. Прибирання за собою
 frappe.db.rollback()
 removed = 0

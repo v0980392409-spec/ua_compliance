@@ -21,6 +21,7 @@ CURRENCY_EXCHANGE_FIELDS = {
 			"default": "1",
 			"insert_after": "ua_source_rate",
 			"read_only": 1,
+			"in_list_view": 1,
 			"description": "Як в as-is регістрі «Курси валют»: скільки одиниць валюти котирується",
 		},
 		{
@@ -29,6 +30,7 @@ CURRENCY_EXCHANGE_FIELDS = {
 			"fieldtype": "Data",
 			"insert_after": "ua_multiplicity",
 			"read_only": 1,
+			"in_list_view": 1,
 		},
 	]
 }
@@ -50,6 +52,17 @@ def after_migrate():
 
 def setup_fields():
 	create_custom_fields(CURRENCY_EXCHANGE_FIELDS, ignore_validate=True)
+	# Список курсів — за датою, новіші вгорі (контракт екранів, екран 1): так їх
+	# дивляться в as-is регістрі «Курси валют», а штатно список іде за ідентифікатором.
+	for prop, value in (("sort_field", "date"), ("sort_order", "DESC")):
+		if frappe.db.get_value(
+			"Property Setter", {"doc_type": "Currency Exchange", "doctype_or_field": "DocType", "property": prop}, "value"
+		) == value:
+			continue
+		frappe.make_property_setter(
+			{"doctype": "Currency Exchange", "doctype_or_field": "DocType", "property": prop, "value": value},
+			validate_fields_for_doctype=False,
+		)
 
 
 def disable_external_rate_provider():
