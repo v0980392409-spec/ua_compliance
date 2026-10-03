@@ -2,7 +2,16 @@
 // Жодного правила тут немає: що будувати й чи зачеплено минулі дати, вирішує сервер,
 // клієнт лише питає рік і, якщо сервер просить, — підтвердження (FR-046).
 
+// День і місяць мають сенс лише для фіксованої дати: у Великодня й Трійці вони
+// рахуються щороку, і «0» у списку читалося б як помилка даних.
+function ua_fixed_date_only(value, df, doc) {
+	return `<span>${doc.rule_type === "Фіксована дата" && value ? value : ""}</span>`;
+}
+
 frappe.listview_settings["UA Holiday Rule"] = {
+	add_fields: ["rule_type"],
+	hide_name_column: true,
+	formatters: { day: ua_fixed_date_only, month: ua_fixed_date_only },
 	onload(listview) {
 		listview.page.add_inner_button(__("Побудувати календар"), () => {
 			frappe.prompt(

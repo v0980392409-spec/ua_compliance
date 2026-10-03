@@ -30,3 +30,18 @@ msgstr "Пакет оновлень"
 
 msgid "Legal parameter"
 msgstr "Законодавчий параметр"
+
+msgid "UA Holiday Rule"
+msgstr "Свято"
+
+msgid "UA Classifier Entry"
+msgstr "Код класифікатора"
+
+msgid "UA Update Package File"
+msgstr "Файл пакета"
+
+msgid "UA Update Package Change"
+msgstr "Зміна з пакета"
+
+msgid "UA-Норма робочого часу"
+msgstr "Норма робочого часу"

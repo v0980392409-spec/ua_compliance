@@ -989,6 +989,19 @@ chk(
 	and all(log_meta.get_field(f).in_standard_filter for f in ("kind", "result")),
 )
 
+# 12а-3. Кожен доктайп і звіт застосунку має український підпис (спіймано на демо:
+# «UA Holiday Rule» і «UA-Норма робочого часу» в заголовках)
+_lang = frappe.local.lang
+frappe.local.lang = "uk"
+frappe.local.lang_full_dict = None
+_names = frappe.get_all("DocType", filters={"module": "UA Compliance"}, pluck="name") + frappe.get_all(
+	"Report", filters={"module": "UA Compliance"}, pluck="name"
+)
+untranslated = [n for n in _names if frappe._(n) == n]
+frappe.local.lang = _lang
+frappe.local.lang_full_dict = None
+chk("доктайпи й звіти застосунку мають український підпис", not untranslated, ", ".join(untranslated) or f"{len(_names)} назв")
+
 # 12б. Розклад курсу живе в налаштуваннях: такт звіряє час і не дублює запуск
 from datetime import datetime as _dt
 from datetime import timedelta as _td
