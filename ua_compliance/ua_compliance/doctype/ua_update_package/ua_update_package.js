@@ -105,7 +105,14 @@ function ua_decide(frm, rows) {
 function ua_show_warnings(frm) {
 	frappe.call({ method: "ua_compliance.api.get_update_warnings" }).then(({ message }) => {
 		if (message && message.length) {
-			frm.dashboard.set_headline_alert(message.map((text) => frappe.utils.escape_html(text)).join("<br>"), "orange");
+			frm.dashboard.set_headline_alert(message.map(ua_link_packages).join("<br>"), "orange");
 		}
 	});
+}
+
+// Ім'я пакета в попередженні — посилання на сам пакет, щоб не шукати його в списку.
+function ua_link_packages(text) {
+	return frappe.utils
+		.escape_html(text)
+		.replace(/UA-PKG-[^\s,]+/g, (name) => `<a href="/app/ua-update-package/${encodeURIComponent(name)}">${name}</a>`);
 }

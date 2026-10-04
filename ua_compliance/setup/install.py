@@ -113,7 +113,10 @@ WARNINGS_SCRIPT = """
 frappe.call("ua_compliance.api.get_update_warnings").then(({ message }) => {
 	const box = root_element.querySelector(".ua-warnings");
 	if (!message || !message.length) return;
-	box.innerHTML = message.map((text) => "<div>" + frappe.utils.escape_html(text) + "</div>").join("");
+	// Ім'я пакета — посилання на пакет, щоб не шукати його в списку.
+	const link = (text) => frappe.utils.escape_html(text).replace(/UA-PKG-[^\\s,]+/g,
+		(name) => '<a href="/app/ua-update-package/' + encodeURIComponent(name) + '">' + name + "</a>");
+	box.innerHTML = message.map((text) => "<div>" + link(text) + "</div>").join("");
 	box.style.display = "block";
 });
 """

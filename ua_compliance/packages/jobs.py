@@ -97,6 +97,17 @@ def current_warnings():
 	return warnings
 
 
+def uk_days(n):
+	"""«день / дні / днів» за українським правилом: 1, 21 — день; 2–4, 22–24 — дні;
+	решта, і 11–14 — днів."""
+	n = abs(int(n))
+	if n % 10 == 1 and n % 100 != 11:
+		return "день"
+	if n % 10 in (2, 3, 4) and n % 100 not in (12, 13, 14):
+		return "дні"
+	return "днів"
+
+
 def stale_threshold(settings):
 	"""Поріг давності в днях. 0 — законне значення («попереджати одразу»), тож не
 	«or 45»: так нуль мовчки ставав 45 (спіймано на перевірці на екрані 04.10.2026)."""
@@ -118,7 +129,7 @@ def _package_warnings(settings):
 	else:
 		if getdate(last_applied[0].applied_on) < getdate(add_days(today(), -threshold)):
 			days = (getdate(today()) - getdate(last_applied[0].applied_on)).days
-			warnings.append(f"Оновлення законодавства не надходили {days} днів")
+			warnings.append(f"Оновлення законодавства не надходили {days} {uk_days(days)}")
 		# Строк придатності останнього застосованого маніфесту — видавець обіцяв новий
 		# пакет до цієї дати; минула, а нового немає — дані, ймовірно, застаріли.
 		expires = last_applied[0].expires_on

@@ -1170,6 +1170,26 @@ chk(
 	and stale_threshold(frappe._dict(stale_warning_days=45)) == 45,
 )
 
+# Мелочі з перевірки на екрані 04.10.2026: відмінювання днів і посилання без схеми
+from ua_compliance.packages.jobs import uk_days
+
+chk(
+	"«1 день, 3 дні, 5 днів, 11 днів, 21 день, 22 дні» у попередженні",
+	[uk_days(n) for n in (1, 3, 5, 11, 21, 22, 112)] == ["день", "дні", "днів", "днів", "день", "дні", "днів"],
+)
+try:
+	frappe.get_doc(
+		{
+			"doctype": "UA Legal Parameter", "code": "TEST_URL_SCHEME", "parameter_name": "Перевірка посилання",
+			"value_type": "Сума", "value_number": 1, "valid_from": "2001-01-01", "basis_type": "Закон",
+			"basis_number": "1-IX", "basis_date": "2001-01-01", "basis_url": "zakon.rada.gov.ua/laws/show/1-20",
+			"source": "Введено вручну", "verified_on": "2026-10-04",
+		}
+	).insert(ignore_permissions=True)
+	chk("посилання на норму без https:// не приймається", False, "збереглося")
+except frappe.ValidationError as error:
+	chk("посилання на норму без https:// не приймається", "https://" in str(error), str(error)[:90])
+
 # T067 і T065: картка пакета вкладками, блок попереджень у розділі
 package_meta = frappe.get_meta("UA Update Package")
 chk(

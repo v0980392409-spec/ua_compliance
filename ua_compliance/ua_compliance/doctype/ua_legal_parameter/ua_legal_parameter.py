@@ -13,6 +13,8 @@ from frappe import _
 from frappe.model.document import Document
 from frappe.utils import getdate
 
+from ua_compliance.basis import validate_basis_url
+
 CODE_PATTERN = re.compile(r"^[A-Z][A-Z0-9_]*$")
 
 VALUE_FIELD_BY_TYPE = {
@@ -28,6 +30,7 @@ VALUE_FIELD_BY_TYPE = {
 class UALegalParameter(Document):
 	def validate(self):
 		self.validate_code()
+		validate_basis_url(self)
 		self.validate_period()
 		self.validate_value()
 		self.validate_overlap()
