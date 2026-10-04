@@ -39,7 +39,7 @@ class UALegalParameter(Document):
 			frappe.throw(_("Код параметра пишеться латиницею великими літерами: MIN_WAGE"))
 
 	def validate_period(self):
-		if self.valid_to and self.valid_to < self.valid_from:
+		if self.valid_to and getdate(self.valid_to) < getdate(self.valid_from):
 			frappe.throw(_("Дата закінчення дії раніша за дату початку"))
 
 	def validate_value(self):

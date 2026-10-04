@@ -67,7 +67,9 @@ def _fill(doc, row, source_reference):
 	doc.value_type = row["value_type"]
 	doc.set(VALUE_FIELD[row["value_type"]], row["value"])
 	doc.unit = row.get("unit")
-	doc.valid_to = row.get("valid_to") or None
+	# Дати з пакета — рядки; приводимо одразу, інакше порівняння з датою з бази падає
+	# (спіймано на репетиції 04.10.2026: пакет задав дату закінчення наявному запису).
+	doc.valid_to = getdate(row["valid_to"]) if row.get("valid_to") else None
 	doc.basis_type = row["basis_type"]
 	doc.basis_number = row["basis_number"]
 	doc.basis_date = row["basis_date"]

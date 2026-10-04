@@ -640,6 +640,31 @@ try:
 		and frappe.db.exists("UA Operation Log", {"kind": "Застосування пакета", "result": "Помилка", "package": package_fail.name}),
 	)
 
+	# 9.5в Пакет задає дату закінчення наявному запису (рядок пакета з valid_to).
+	# Спіймано на репетиції: порівняння рядка з датою з бази падало TypeError.
+	make_param("2025-01-01", 7500, code="TEST_PKG_PERIOD")
+	period_csv = (
+		PARAMETERS_CSV.replace("TEST_PKG_MIN_WAGE", "TEST_PKG_PERIOD")
+		.replace(",9546,грн,2027-01-01,,", ",8000,грн,2025-01-01,2025-12-31,")
+	)
+	period_pkg = build_package(period_csv, keys=SIGNERS, version=V(20261014))
+	package_period, _ok = take(period_pkg, version=V(20261014))
+	package_period.reload()
+	package_period.decide({row.name: "Прийняти з пакета" for row in package_period.preview if row.conflict})
+	package_period.reload()
+	try:
+		package_period.approve_and_apply(period_pkg)
+		period_row = frappe.db.get_value(
+			"UA Legal Parameter", {"code": "TEST_PKG_PERIOD", "valid_from": "2025-01-01"}, ["value_number", "valid_to", "source"], as_dict=True
+		)
+		chk(
+			"пакет із датою закінчення змінює наявний запис (рядок пакета з valid_to)",
+			period_row.value_number == 8000 and str(period_row.valid_to) == "2025-12-31" and period_row.source == "З пакета",
+			str(period_row),
+		)
+	except Exception as error:
+		chk("пакет із датою закінчення змінює наявний запис (рядок пакета з valid_to)", False, f"{type(error).__name__}: {error}"[:120])
+
 	# 9.6 Попередження про прострочений пакет (FR-038)
 	stale = build_package(
 		PARAMETERS_CSV.replace("TEST_PKG_MIN_WAGE", "TEST_PKG_STALE"), keys=SIGNERS, version=V(20261010)
