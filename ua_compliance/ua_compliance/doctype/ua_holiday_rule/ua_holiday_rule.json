@@ -32,6 +32,7 @@
    "fieldtype": "Data",
    "in_list_view": 1,
    "label": "\u041d\u0430\u0437\u0432\u0430",
+   "length": 255,
    "reqd": 1
   },
   {
@@ -118,6 +119,7 @@
    "fieldname": "basis_url",
    "fieldtype": "Data",
    "label": "\u041f\u043e\u0441\u0438\u043b\u0430\u043d\u043d\u044f \u043d\u0430 \u0442\u0435\u043a\u0441\u0442",
+   "length": 500,
    "reqd": 1
   },
   {
@@ -138,7 +140,7 @@
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-10-02 22:56:45.969572",
+ "modified": "2026-10-04 21:48:00.000000",
  "modified_by": "Administrator",
  "module": "UA Compliance",
  "name": "UA Holiday Rule",

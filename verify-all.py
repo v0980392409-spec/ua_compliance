@@ -703,11 +703,20 @@ try:
 	feed_bad = build_package(
 		PARAMETERS_CSV.replace("TEST_PKG_MIN_WAGE", "TEST_PKG_FEED_BAD"), keys=SIGNERS[:1], version=V(20261021)
 	)
-	feed_files = {"https://feed.test/20261021/bad.zip": feed_bad, "https://feed.test/20261020/good.zip": feed_good}
+	# Адреса — у справжній формі релізу GitHub із темою в тезі: такий вигляд мав
+	# parameters-20261005-martial-law, і його адреса (143 символи) не влізла в поле на 140 —
+	# обидва екземпляри пакет не прийняли (04.10.2026). Коротка адреса цього не ловила.
+	FEED_TOPIC = "budget-2027-subsistence-minimum-after-second-reading"
+	GOOD_URL = (
+		"https://feed.test/v0980392409-spec/ua_compliance_data/releases/download/"
+		f"parameters-20261020-{FEED_TOPIC}/ua-parameters-20261020-{FEED_TOPIC}.zip"
+	)
+	BAD_URL = "https://feed.test/20261021/bad.zip"
+	feed_files = {BAD_URL: feed_bad, GOOD_URL: feed_good}
 	feed_releases = [
 		{"tag_name": f"parameters-{v}", "published_at": f"2026-10-{d}T08:00:00Z", "draft": False, "prerelease": False,
-		 "assets": [{"name": n, "browser_download_url": f"https://feed.test/{v}/{n}", "size": 1}]}
-		for v, d, n in (("20261021", "21", "bad.zip"), ("20261020", "20", "good.zip"))
+		 "assets": [{"name": url.rsplit("/", 1)[1], "browser_download_url": url, "size": 1}]}
+		for v, d, url in (("20261021", "21", BAD_URL), ("20261020", "20", GOOD_URL))
 	]
 	_fetch, _download = feed_module.fetch_releases, feed_module.download
 	# Налаштування могли жодного разу не зберігатися: тоді рядків у Singles немає й діють
@@ -731,8 +740,13 @@ try:
 				fields=["name", "state", "source_url", "reject_reason", "applied_on"],
 			)
 		}
-		good_row = stored.get("https://feed.test/20261020/good.zip")
-		bad_row = stored.get("https://feed.test/20261021/bad.zip")
+		good_row = stored.get(GOOD_URL)
+		bad_row = stored.get(BAD_URL)
+		chk(
+			f"адреса пакета з каналу ({len(GOOD_URL)} символів) зберігається повністю",
+			good_row is not None and len(GOOD_URL) > 140,
+			", ".join(f"{len(url)}" for url in stored),
+		)
 		chk(
 			"забраний пакет перевірено й поставлено на рішення, а не застосовано (FR-039)",
 			good_row is not None and good_row.state == "До застосування" and not good_row.applied_on
@@ -781,6 +795,48 @@ try:
 		"налаштування повернуто точно, як були",
 		frappe.db.sql(singles_query, SETTINGS) == _singles,
 		f"рядків {len(_singles)}",
+	)
+
+	# 9.7а Довгі значення з пакета: поля, у які пише пакет, довші за 140 символів платформи
+	# (адреси постанов Кабміну — понад 140). Інакше пакет падав би вже під час застосування,
+	# після затвердження. Пишемо CSV модулем csv — у значеннях коми.
+	import csv as _csv
+	import io as _io
+
+	LONG = {
+		"parameter_name": "Тестова назва параметра " + "д" * 225,
+		"value": "Текстове значення " + "з" * 232,
+		"basis_clause": "абзац " + "п" * 244,
+		"basis_url": "https://www.kmu.gov.ua/npas/" + "pro-zatverdzhennia-poriadku-" * 16,
+	}
+	long_buffer = _io.StringIO()
+	long_writer = _csv.writer(long_buffer, lineterminator="\n")
+	long_writer.writerow(PARAMETERS_CSV.splitlines()[0].split(","))
+	long_writer.writerow([
+		"TEST_PKG_LONG", LONG["parameter_name"], "Рядок", LONG["value"], "", "2027-01-01", "",
+		"Постанова КМУ", "0000", "2026-12-01", LONG["basis_clause"], LONG["basis_url"], "2026-10-04",
+	])
+	long_raw = build_package(long_buffer.getvalue(), keys=SIGNERS, version=V(20261016))
+	long_package, long_ok = take(long_raw, version=V(20261016))
+	long_applied = None
+	if long_ok:
+		long_package.approve_and_apply(long_raw)
+		long_applied = frappe.db.get_value(
+			"UA Legal Parameter", {"code": "TEST_PKG_LONG"},
+			["parameter_name", "value_text", "basis_clause", "basis_url"], as_dict=True,
+		)
+	chk(
+		"пакет із довгими значеннями застосовується без обрізання ("
+		+ ", ".join(f"{k} {len(v)}" for k, v in LONG.items()) + ")",
+		long_applied is not None
+		and long_applied.parameter_name == LONG["parameter_name"]
+		and long_applied.value_text == LONG["value"]
+		and long_applied.basis_clause == LONG["basis_clause"]
+		and long_applied.basis_url == LONG["basis_url"]
+		and LONG["value"] in frappe.get_all(
+			"UA Update Package Change", filters={"parent": long_package.name}, pluck="new_value"
+		),
+		f"{long_package.state} {long_package.reject_reason or ''}",
 	)
 
 	# 9.8 Ручне заведення з форми: людина обирає лише канал

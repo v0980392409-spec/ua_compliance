@@ -74,8 +74,8 @@
    "in_standard_filter": 1,
    "label": "\u0421\u0442\u0430\u043d",
    "options": "\u041e\u0442\u0440\u0438\u043c\u0430\u043d\u043e\n\u041f\u0435\u0440\u0435\u0432\u0456\u0440\u0435\u043d\u043e\n\u0414\u043e \u0437\u0430\u0441\u0442\u043e\u0441\u0443\u0432\u0430\u043d\u043d\u044f\n\u0417\u0430\u0442\u0432\u0435\u0440\u0434\u0436\u0435\u043d\u043e\n\u0417\u0430\u0441\u0442\u043e\u0441\u043e\u0432\u0430\u043d\u043e\n\u0412\u0456\u0434\u0445\u0438\u043b\u0435\u043d\u043e",
-   "reqd": 1,
-   "read_only": 1
+   "read_only": 1,
+   "reqd": 1
   },
   {
    "fieldname": "col_head",
@@ -93,12 +93,13 @@
    "label": "\u041c\u0456\u043d\u0456\u043c\u0430\u043b\u044c\u043d\u0430 \u0432\u0435\u0440\u0441\u0456\u044f \u0437\u0430\u0441\u0442\u043e\u0441\u0443\u043d\u043a\u0443"
   },
   {
+   "description": "\u0410\u0434\u0440\u0435\u0441\u0430 \u043f\u0430\u043a\u0435\u0442\u0430 \u0432 \u043a\u0430\u043d\u0430\u043b\u0456 \u0440\u043e\u0437\u0434\u0430\u0447\u0456; \u043f\u043e\u0440\u043e\u0436\u043d\u044c\u043e \u2014 \u043f\u0430\u043a\u0435\u0442 \u043f\u0440\u0438\u043a\u0440\u0456\u043f\u043b\u0435\u043d\u043e \u0432\u0440\u0443\u0447\u043d\u0443",
    "fieldname": "source_url",
    "fieldtype": "Data",
    "label": "\u0417\u0432\u0456\u0434\u043a\u0438 \u043e\u0442\u0440\u0438\u043c\u0430\u043d\u043e",
+   "length": 500,
    "options": "URL",
-   "read_only": 1,
-   "description": "\u0410\u0434\u0440\u0435\u0441\u0430 \u043f\u0430\u043a\u0435\u0442\u0430 \u0432 \u043a\u0430\u043d\u0430\u043b\u0456 \u0440\u043e\u0437\u0434\u0430\u0447\u0456; \u043f\u043e\u0440\u043e\u0436\u043d\u044c\u043e \u2014 \u043f\u0430\u043a\u0435\u0442 \u043f\u0440\u0438\u043a\u0440\u0456\u043f\u043b\u0435\u043d\u043e \u0432\u0440\u0443\u0447\u043d\u0443"
+   "read_only": 1
   },
   {
    "fieldname": "manifest_hash",
@@ -145,27 +146,27 @@
    "label": "\u041f\u0440\u0438\u0447\u0438\u043d\u0430 \u0432\u0456\u0434\u0445\u0438\u043b\u0435\u043d\u043d\u044f"
   },
   {
+   "depends_on": "expiry_override",
    "fieldname": "expiry_override",
    "fieldtype": "Check",
    "label": "\u0411\u043b\u043e\u043a\u0443\u0432\u0430\u043d\u043d\u044f \u0437\u0430 \u0441\u0442\u0440\u043e\u043a\u043e\u043c \u0437\u043d\u044f\u0442\u043e",
-   "read_only": 1,
-   "depends_on": "expiry_override"
+   "read_only": 1
   },
   {
+   "depends_on": "expiry_override",
    "fieldname": "expiry_override_by",
    "fieldtype": "Link",
    "label": "\u0417\u043d\u044f\u0432 \u0431\u043b\u043e\u043a\u0443\u0432\u0430\u043d\u043d\u044f",
    "options": "User",
-   "read_only": 1,
-   "depends_on": "expiry_override"
+   "read_only": 1
   },
   {
    "fieldname": "approved_by",
    "fieldtype": "Link",
+   "in_list_view": 1,
    "label": "\u0417\u0430\u0442\u0432\u0435\u0440\u0434\u0438\u0432",
    "options": "User",
-   "read_only": 1,
-   "in_list_view": 1
+   "read_only": 1
   },
   {
    "fieldname": "col_result",
@@ -180,9 +181,9 @@
   {
    "fieldname": "applied_on",
    "fieldtype": "Datetime",
+   "in_list_view": 1,
    "label": "\u0417\u0430\u0441\u0442\u043e\u0441\u043e\u0432\u0430\u043d\u043e",
-   "read_only": 1,
-   "in_list_view": 1
+   "read_only": 1
   },
   {
    "fieldname": "tab_files",
@@ -222,7 +223,7 @@
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-10-04 10:14:19.000000",
+ "modified": "2026-10-04 21:48:00.000000",
  "modified_by": "Administrator",
  "module": "UA Compliance",
  "name": "UA Update Package",
