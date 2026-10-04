@@ -3,7 +3,12 @@
  "charts": [],
  "content": "[{\"id\": \"hdr\", \"type\": \"header\", \"data\": {\"text\": \"<span class=\\\"h4\\\"><b>\\u0417\\u0430\\u043a\\u043e\\u043d\\u043e\\u0434\\u0430\\u0432\\u0441\\u0442\\u0432\\u043e</b></span>\", \"col\": 12}}, {\"id\": \"warn\", \"type\": \"custom_block\", \"data\": {\"custom_block_name\": \"\\u041f\\u043e\\u043f\\u0435\\u0440\\u0435\\u0434\\u0436\\u0435\\u043d\\u043d\\u044f \\u0437\\u0430\\u043a\\u043e\\u043d\\u043e\\u0434\\u0430\\u0432\\u0441\\u0442\\u0432\\u0430\", \"col\": 12}}, {\"id\": \"sc1\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"\\u0417\\u0430\\u043a\\u043e\\u043d\\u043e\\u0434\\u0430\\u0432\\u0447\\u0456 \\u043f\\u0430\\u0440\\u0430\\u043c\\u0435\\u0442\\u0440\\u0438\", \"col\": 3}}, {\"id\": \"sc2\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"\\u041f\\u0430\\u043a\\u0435\\u0442\\u0438 \\u043e\\u043d\\u043e\\u0432\\u043b\\u0435\\u043d\\u044c\", \"col\": 3}}, {\"id\": \"sc3\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"\\u041a\\u0443\\u0440\\u0441\\u0438 \\u0432\\u0430\\u043b\\u044e\\u0442\", \"col\": 3}}, {\"id\": \"sc4\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"\\u0421\\u0432\\u044f\\u0442\\u0430\", \"col\": 3}}, {\"id\": \"sc5\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"\\u041a\\u043b\\u0430\\u0441\\u0438\\u0444\\u0456\\u043a\\u0430\\u0442\\u043e\\u0440\\u0438\", \"col\": 3}}, {\"id\": \"sc6\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"\\u0416\\u0443\\u0440\\u043d\\u0430\\u043b \\u043e\\u043f\\u0435\\u0440\\u0430\\u0446\\u0456\\u0439\", \"col\": 3}}, {\"id\": \"sc7\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"\\u041d\\u043e\\u0440\\u043c\\u0430 \\u0440\\u043e\\u0431\\u043e\\u0447\\u043e\\u0433\\u043e \\u0447\\u0430\\u0441\\u0443\", \"col\": 3}}, {\"id\": \"sp1\", \"type\": \"spacer\", \"data\": {\"col\": 12}}, {\"id\": \"cd1\", \"type\": \"card\", \"data\": {\"card_name\": \"\\u0417\\u043d\\u0430\\u0447\\u0435\\u043d\\u043d\\u044f, \\u0437\\u0430\\u0434\\u0430\\u043d\\u0456 \\u0437\\u0430\\u043a\\u043e\\u043d\\u043e\\u043c\", \"col\": 4}}, {\"id\": \"cd2\", \"type\": \"card\", \"data\": {\"card_name\": \"\\u041e\\u043d\\u043e\\u0432\\u043b\\u0435\\u043d\\u043d\\u044f\", \"col\": 4}}, {\"id\": \"cd3\", \"type\": \"card\", \"data\": {\"card_name\": \"\\u041a\\u0430\\u043b\\u0435\\u043d\\u0434\\u0430\\u0440 \\u0456 \\u043d\\u043e\\u0440\\u043c\\u0430 \\u0447\\u0430\\u0441\\u0443\", \"col\": 4}}, {\"id\": \"cd4\", \"type\": \"card\", \"data\": {\"card_name\": \"\\u0416\\u0443\\u0440\\u043d\\u0430\\u043b \\u0456 \\u043d\\u0430\\u043b\\u0430\\u0448\\u0442\\u0443\\u0432\\u0430\\u043d\\u043d\\u044f\", \"col\": 4}}]",
  "creation": "2026-10-02 22:15:54.460300",
- "custom_blocks": [],
+ "custom_blocks": [
+  {
+   "custom_block_name": "\u041f\u043e\u043f\u0435\u0440\u0435\u0434\u0436\u0435\u043d\u043d\u044f \u0437\u0430\u043a\u043e\u043d\u043e\u0434\u0430\u0432\u0441\u0442\u0432\u0430",
+   "label": "\u041f\u043e\u043f\u0435\u0440\u0435\u0434\u0436\u0435\u043d\u043d\u044f \u0437\u0430\u043a\u043e\u043d\u043e\u0434\u0430\u0432\u0441\u0442\u0432\u0430"
+  }
+ ],
  "docstatus": 0,
  "doctype": "Workspace",
  "hide_custom": 0,
@@ -141,7 +146,7 @@
    "type": "Link"
   }
  ],
- "modified": "2026-10-04 10:14:00.000000",
+ "modified": "2026-10-04 12:00:58.000000",
  "modified_by": "Administrator",
  "module": "UA Compliance",
  "name": "\u0417\u0430\u043a\u043e\u043d\u043e\u0434\u0430\u0432\u0441\u0442\u0432\u043e",

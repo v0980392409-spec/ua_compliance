@@ -1157,11 +1157,16 @@ section_blocks = [
 	for b in frappe.parse_json(frappe.db.get_value("Workspace", "Законодавство", "content"))
 	if b["type"] == "custom_block"
 ]
+# Розділ малює блок лише з таблиці custom_blocks (frappe.desk.desktop), розкладки мало —
+# саме так блок не показувався на екрані при зеленій перевірці розкладки (04.10.2026)
+from frappe.desk.desktop import get_desktop_page
+
+_page = get_desktop_page(frappe.as_json({"name": "Законодавство", "title": "Законодавство", "public": 1}))
 chk(
-	"у розділі є блок попереджень, і він існує",
+	"у розділі є блок попереджень: у розкладці й у тому, що віддається на сторінку",
 	section_blocks == ["Попередження законодавства"]
-	and frappe.db.exists("Custom HTML Block", "Попередження законодавства"),
-	str(section_blocks),
+	and [b.custom_block_name for b in _page["custom_blocks"]["items"]] == ["Попередження законодавства"],
+	str([b.custom_block_name for b in _page["custom_blocks"]["items"]]),
 )
 
 # 12б. Розклад курсу живе в налаштуваннях: такт звіряє час і не дублює запуск
