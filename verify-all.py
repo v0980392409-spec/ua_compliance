@@ -1085,6 +1085,80 @@ try:
 finally:
 	keys_module.TRUSTED_KEYS[:] = _production_keys
 
+# 12.1. Дерево класифікаторів (контракт екранів, екран 9). Тестові коди з пункту 12 ще на
+# місці: область → район → громада, громада закрита датою. Метод вузлів кличемо так само,
+# як його кличе дерево в браузері: корінь — назва класифікатора, далі — ім'я запису.
+from frappe.desk.form.meta import get_meta as get_tree_form_meta
+
+from ua_compliance.ua_compliance.doctype.ua_classifier_entry import ua_classifier_entry as cls_tree
+
+tree_js = get_tree_form_meta("UA Classifier Entry", cached=False).get("__tree_js") or ""
+chk(
+	"скрипт дерева класифікаторів підхоплено платформою: лише читання, без «Розгорнути все»",
+	"ua_classifier_entry.get_children" in tree_js
+	and all(flag in tree_js for flag in ("show_expand_all: false", "disable_add_node: true", "get_tree_root: false"))
+	and cls_tree.get_children in frappe.whitelisted,
+	f"{len(tree_js)} символів",
+)
+TEST_ROOT, TEST_DISTRICT, TEST_COMMUNITY = (f"КАТОТТГ-UA0000000000000000{n}" for n in (1, 2, 3))
+tree_roots = cls_tree.get_children("UA Classifier Entry", parent="КАТОТТГ", is_root="true", classifier="КАТОТТГ")
+root_row = next((row for row in tree_roots if row.value == TEST_ROOT), None)
+chk(
+	"корені КАТОТТГ — записи без батьківського коду, тестова область розгортається",
+	root_row is not None and root_row.expandable == 1 and TEST_DISTRICT not in [row.value for row in tree_roots],
+	f"коренів {len(tree_roots)}",
+)
+district_rows = cls_tree.get_children("UA Classifier Entry", parent=TEST_ROOT, classifier="КАТОТТГ")
+community_rows = cls_tree.get_children("UA Classifier Entry", parent=TEST_DISTRICT, classifier="КАТОТТГ")
+chk(
+	"діти вузла — за кодом батьківського запису; закрита громада лишається в дереві листком із датою",
+	[(row.value, row.expandable) for row in district_rows] == [(TEST_DISTRICT, 1)]
+	and [(row.value, row.expandable) for row in community_rows] == [(TEST_COMMUNITY, 0)]
+	and community_rows[0].valid_to is not None,
+	f"{district_rows} / {community_rows}",
+)
+kved_roots = cls_tree.get_children("UA Classifier Entry", parent="КВЕД", is_root=1, classifier="КВЕД")
+chk(
+	"дерево не змішує класифікатори: у КВЕД немає кодів КАТОТТГ, чужий батько — порожньо",
+	not any(row.value.startswith("КАТОТТГ-") for row in kved_roots)
+	and cls_tree.get_children("UA Classifier Entry", parent=TEST_ROOT, classifier="КВЕД") == [],
+	f"коренів КВЕД {len(kved_roots)}",
+)
+try:
+	cls_tree.get_children("UA Classifier Entry", parent="ДК 003", is_root=1, classifier="ДК 003")
+	tree_refused = False
+except frappe.ValidationError:
+	tree_refused = True
+frappe.clear_messages()
+chk("ДК 003 деревом не показується — за контрактом він списком", tree_refused)
+
+orphans = frappe.db.sql(
+	"""select count(*) from `tabUA Classifier Entry` c
+	left join `tabUA Classifier Entry` p on p.name = concat(c.classifier, '-', c.parent_code)
+	where ifnull(c.parent_code, '') != '' and p.name is null"""
+)[0][0]
+chk("дерево цілісне: кожен батьківський код є в тому самому класифікаторі", orphans == 0, f"сиріт {orphans}")
+chk(
+	"«Код батьківського запису» проіндексовано — інакше кожне розгортання читає всю таблицю",
+	bool(frappe.db.sql("show index from `tabUA Classifier Entry` where Column_name = 'parent_code'")),
+)
+widest = frappe.db.sql(
+	"""select classifier, parent_code from `tabUA Classifier Entry`
+	where ifnull(parent_code, '') != '' group by classifier, parent_code order by count(*) desc limit 1""",
+	as_dict=True,
+)
+if widest:
+	widest_parent = f"{widest[0].classifier}-{widest[0].parent_code}"
+	started_tree = _time.time()
+	widest_rows = cls_tree.get_children("UA Classifier Entry", parent=widest_parent, classifier=widest[0].classifier)
+	cls_tree.get_children("UA Classifier Entry", parent=widest[0].classifier, is_root=1, classifier=widest[0].classifier)
+	tree_elapsed = _time.time() - started_tree
+	chk(
+		"найширший вузол і корінь розгортаються швидше за секунду",
+		tree_elapsed < 1,
+		f"{widest_parent}: {len(widest_rows)} дітей, {tree_elapsed:.2f} с",
+	)
+
 # 12а. Розділ «Законодавство»: ярлики з контракту екранів (pages-ui, екран 11), читаємо
 # збережений воркспейс, а не файл, — migrate буває, що підміняє його
 workspace = frappe.get_doc("Workspace", "Законодавство")
