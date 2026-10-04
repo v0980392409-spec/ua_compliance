@@ -130,6 +130,32 @@ def _write_log(summary, started, triggered_by):
 			"triggered_by": triggered_by or frappe.session.user,
 		}
 	).insert(ignore_permissions=True)
+	if summary["errors"]:
+		_warn_on_failure_series()
+
+
+def _warn_on_failure_series():
+	"""Серія неудач досягла порогу — попередження в журнал одразу, а не наступного ранку.
+	Пишемо лише раз на серію: доки попередження про серію вже стоїть після останнього
+	успіху, повтор нічого не додає."""
+	from ua_compliance import journal
+	from ua_compliance.packages.jobs import rate_failure_warnings
+
+	warnings = rate_failure_warnings()
+	if not warnings:
+		return
+	last_success = frappe.get_all(
+		"UA Operation Log",
+		filters={"kind": "Завантаження курсу", "result": "Успішно"},
+		pluck="started_at",
+		order_by="started_at desc",
+		limit=1,
+	)
+	filters = {"kind": "Попередження", "message": ["like", "Курс НБУ не завантажується%"]}
+	if last_success:
+		filters["started_at"] = [">", last_success[0]]
+	if not frappe.db.exists("UA Operation Log", filters):
+		journal.write("Попередження", "Увага", warnings[0])
 
 
 # Вікно, у якому запуск ще вважається «вчасним»: такт планувальника — 15 хвилин,

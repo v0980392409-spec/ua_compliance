@@ -412,6 +412,39 @@ try:
 		not ok_expired and "строк придатності" in (package_expired.reject_reason or ""),
 		package_expired.reject_reason,
 	)
+	# T063 Блокування за строком знімає лише адміністратор, і це в журналі (FR-037)
+	frappe.set_user("Guest")
+	try:
+		package_expired.unlock_expired(expired)
+		chk("зняти блокування за строком може лише адміністратор", False, "зняв гість")
+	except frappe.ValidationError as error:
+		chk("зняти блокування за строком може лише адміністратор", "адміністратор" in str(error), str(error)[:80])
+	finally:
+		frappe.set_user("Administrator")
+	package_expired.reload()
+	unlocked = package_expired.unlock_expired(expired)
+	stored_unlock = frappe.db.get_value(
+		"UA Update Package", package_expired.name, ["state", "expiry_override", "expiry_override_by"], as_dict=True
+	)
+	chk(
+		"адміністратор зняв блокування — пакет перевірено знову й готовий до затвердження (FR-037)",
+		unlocked and stored_unlock.state == "До застосування" and stored_unlock.expiry_override == 1
+		and stored_unlock.expiry_override_by == "Administrator"
+		and frappe.db.exists("UA Operation Log", {"kind": "Рішення щодо пакета", "package": package_expired.name, "message": ["like", "Знято блокування%"]}),
+		str(stored_unlock),
+	)
+	package_expired.reload()
+	package_expired.approve_and_apply(expired)
+	chk(
+		"прострочений маніфест застосовано після зняття блокування — повторна перевірка теж його пропускає",
+		frappe.db.get_value("UA Update Package", package_expired.name, "state") == "Застосовано",
+	)
+	# T065 Строк придатності останнього застосованого маніфесту минув — попередження й у розділі
+	chk(
+		"попередження «строк останнього пакета минув» видно через розділ і картку (FR-038)",
+		any("Строк придатності останнього пакета минув 01.01.2020" in w for w in api.get_update_warnings()),
+		"; ".join(api.get_update_warnings())[:150],
+	)
 
 	bad_hash = build_package(PARAMETERS_CSV, keys=SIGNERS, version=V(20261005), corrupt_hash=True)
 	package_hash, ok_hash = take(bad_hash, version=V(20261005))
@@ -471,6 +504,25 @@ try:
 			"розходження" in str(error),
 			str(error)[:90],
 		)
+	# T062 Розходження чекає рішення людини: «Перевірено» → рішення → «До застосування»
+	chk(
+		"пакет із нерозв'язаним розходженням стоїть у «Перевірено» (FR-029)",
+		frappe.db.get_value("UA Update Package", package_conflict.name, "state") == "Перевірено",
+	)
+	package_conflict.reload()
+	state_after = package_conflict.decide({row.name: "Залишити ручне" for row in package_conflict.preview if row.conflict})
+	package_conflict.reload()
+	package_conflict.approve_and_apply(conflicting)
+	kept = frappe.db.get_value(
+		"UA Legal Parameter", {"code": "TEST_PKG_MIN_WAGE_MANUAL", "valid_from": "2027-01-01"}, ["value_number", "source"], as_dict=True
+	)
+	chk(
+		"рішення «Залишити ручне»: пакет застосовано, ручний запис не зачеплено (US3/AC8)",
+		state_after == "До застосування" and kept.value_number == 9000 and kept.source == "Введено вручну"
+		and frappe.db.get_value("UA Update Package", package_conflict.name, "state") == "Застосовано"
+		and frappe.db.exists("UA Operation Log", {"kind": "Рішення щодо пакета", "package": package_conflict.name}),
+		str(kept),
+	)
 	# 9.4а Той самий зміст, що введений вручну: не розходження (найчастіший випадок —
 	# пакет запізнився й привіз те, що вже ввели). У базі 9546.0, у пакеті 9546.
 	make_param("2027-01-01", 9546, code="TEST_PKG_SAME_VALUE")
@@ -532,11 +584,60 @@ try:
 		f"{result_offline}, файл {attachment.file_name}",
 	)
 
-	applied_offline = api.approve_package(package_offline.name)
+	approved_offline = api.approve_package(package_offline.name)
 	chk(
-		"кнопка «Затвердити» застосовує пакет (FR-030)",
-		applied_offline["state"] == "Застосовано" and applied_offline["created"] >= 1,
+		"кнопка «Затвердити» лише затверджує — «Затверджено», застосування у фоні (FR-029)",
+		approved_offline["state"] == "Затверджено"
+		and frappe.db.get_value("UA Update Package", package_offline.name, "state") == "Затверджено",
+		str(approved_offline),
+	)
+	applied_offline = api.apply_package_job(package_offline.name)
+	chk(
+		"фонове завдання застосовує затверджений пакет (FR-030)",
+		frappe.db.get_value("UA Update Package", package_offline.name, "state") == "Застосовано"
+		and (applied_offline or {}).get("created", 0) >= 1,
 		str(applied_offline),
+	)
+
+	# 9.5а Рішення «Прийняти з пакета» перезаписує ручний запис — свідомо, з журналом
+	make_param("2027-01-01", 9000, code="TEST_PKG_ACCEPT")
+	accepting = build_package(
+		PARAMETERS_CSV.replace("TEST_PKG_MIN_WAGE", "TEST_PKG_ACCEPT"), keys=SIGNERS, version=V(20261012)
+	)
+	package_accept, _ok = take(accepting, version=V(20261012))
+	package_accept.reload()
+	package_accept.decide({row.name: "Прийняти з пакета" for row in package_accept.preview if row.conflict})
+	package_accept.reload()
+	package_accept.approve_and_apply(accepting)
+	accepted = frappe.db.get_value(
+		"UA Legal Parameter", {"code": "TEST_PKG_ACCEPT", "valid_from": "2027-01-01"}, ["value_number", "source"], as_dict=True
+	)
+	chk(
+		"рішення «Прийняти з пакета»: ручний запис замінено значенням пакета (US3/AC8)",
+		accepted.value_number == 9546 and accepted.source == "З пакета",
+		str(accepted),
+	)
+
+	# 9.5б Невдале фонове застосування не губиться: пакет «Затверджено», причина в журналі
+	failing = build_package(
+		PARAMETERS_CSV.replace("TEST_PKG_MIN_WAGE", "TEST_PKG_FAIL"), keys=SIGNERS, version=V(20261013)
+	)
+	package_fail = receive(failing, "parameters", V(20261013))
+	fail_file = frappe.get_doc(
+		{
+			"doctype": "File", "file_name": "fail.zip", "attached_to_doctype": "UA Update Package",
+			"attached_to_name": package_fail.name, "content": failing, "is_private": 1, "decode": False,
+		}
+	).insert(ignore_permissions=True)
+	api.verify_package(package_fail.name)
+	api.approve_package(package_fail.name)
+	frappe.delete_doc("File", fail_file.name, ignore_permissions=True)
+	api.apply_package_job(package_fail.name)
+	chk(
+		"невдале фонове застосування: пакет лишається «Затверджено», причина в журналі (FR-033)",
+		frappe.db.get_value("UA Update Package", package_fail.name, "state") == "Затверджено"
+		and not frappe.db.exists("UA Legal Parameter", {"code": "TEST_PKG_FAIL"})
+		and frappe.db.exists("UA Operation Log", {"kind": "Застосування пакета", "result": "Помилка", "package": package_fail.name}),
 	)
 
 	# 9.6 Попередження про прострочений пакет (FR-038)
@@ -1035,6 +1136,25 @@ chk(
 	not frappe.get_meta("Currency Exchange").get_field("to_currency").in_list_view,
 )
 
+# T067 і T065: картка пакета вкладками, блок попереджень у розділі
+package_meta = frappe.get_meta("UA Update Package")
+chk(
+	"картка пакета — вкладки «Загальне / Файли / Що зміниться» (контракт екранів, екран 5)",
+	[f.label for f in package_meta.fields if f.fieldtype == "Tab Break"] == ["Загальне", "Файли", "Що зміниться"],
+	str([f.label for f in package_meta.fields if f.fieldtype == "Tab Break"]),
+)
+section_blocks = [
+	b["data"].get("custom_block_name")
+	for b in frappe.parse_json(frappe.db.get_value("Workspace", "Законодавство", "content"))
+	if b["type"] == "custom_block"
+]
+chk(
+	"у розділі є блок попереджень, і він існує",
+	section_blocks == ["Попередження законодавства"]
+	and frappe.db.exists("Custom HTML Block", "Попередження законодавства"),
+	str(section_blocks),
+)
+
 # 12б. Розклад курсу живе в налаштуваннях: такт звіряє час і не дублює запуск
 from datetime import datetime as _dt
 from datetime import timedelta as _td
@@ -1079,6 +1199,23 @@ finally:
 	frappe.clear_document_cache("UA Compliance Settings", "UA Compliance Settings")
 rate_jobs = frappe.get_all("Scheduled Job Type", filters={"method": ["like", "ua_compliance.rates.%"]}, pluck="method")
 chk("у розкладі одне завдання курсу — такт", rate_jobs == ["ua_compliance.rates.job.scheduled_tick"], ", ".join(rate_jobs))
+
+# T066 (після перевірки такту: записи серії в його вікні замаскували б запуск). Серія невдалих завантажень курсу — попередження, один раз на серію
+from ua_compliance import journal as _journal_series
+from ua_compliance.packages.jobs import rate_failure_warnings
+from ua_compliance.rates import job as _rates_job_series
+
+for _ in range(3):
+	_journal_series.write("Завантаження курсу", "Помилка", "перевірка серії: джерело відповіло 403")
+series = rate_failure_warnings()
+_rates_job_series._warn_on_failure_series()
+_rates_job_series._warn_on_failure_series()
+chk(
+	"3 невдачі курсу поспіль — попередження, у журналі один раз на серію",
+	bool(series) and "3 разів поспіль" in series[0]
+	and frappe.db.count("UA Operation Log", {"kind": "Попередження", "message": ["like", "Курс НБУ не завантажується%перевірка серії%"]}) == 1,
+	"; ".join(series),
+)
 
 # 13. Прибирання за собою
 frappe.db.rollback()

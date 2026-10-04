@@ -74,11 +74,50 @@ def verify_package(name):
 
 
 @frappe.whitelist()
-def approve_package(name):
-	"""Затвердження людиною і застосування однією транзакцією."""
+def decide_conflicts(name, decisions):
+	"""Рішення щодо розходжень з ручними записами: {рядок передпоказу: рішення}."""
+	if isinstance(decisions, str):
+		decisions = frappe.parse_json(decisions)
 	package = frappe.get_doc("UA Update Package", name)
-	summary = package.approve_and_apply(_package_bytes(package))
-	return {"state": "Застосовано", **summary}
+	return {"state": package.decide(decisions)}
+
+
+@frappe.whitelist()
+def unlock_expired_package(name):
+	"""Зняття блокування за строком придатності — лише адміністратор, зі слідом у журналі."""
+	package = frappe.get_doc("UA Update Package", name)
+	ok = package.unlock_expired(_package_bytes(package))
+	package.reload()
+	return {"ok": ok, "state": package.state, "reason": package.reject_reason}
+
+
+@frappe.whitelist()
+def approve_package(name):
+	"""Затвердження людиною; застосування — фоновим завданням після фіксації (FR-029)."""
+	package = frappe.get_doc("UA Update Package", name)
+	_package_bytes(package)  # файл має бути на місці ще до затвердження
+	package.approve()
+	frappe.enqueue(
+		"ua_compliance.api.apply_package_job", name=name, queue="short", enqueue_after_commit=True
+	)
+	return {"state": package.state}
+
+
+def apply_package_job(name):
+	"""Фонове застосування затвердженого пакета. Невдача не губиться: відкат і журнал,
+	пакет лишається «Затверджено» — його можна відхилити (FR-029, FR-033)."""
+	package = frappe.get_doc("UA Update Package", name)
+	# Точка збереження, а не повний відкат: застосування відкочується цілком (FR-033),
+	# а чуже незафіксоване в тій самій транзакції лишається.
+	frappe.db.savepoint("ua_apply_package")
+	try:
+		return package.apply(_package_bytes(package))
+	except Exception as error:
+		frappe.db.rollback(save_point="ua_apply_package")
+		from ua_compliance import journal
+
+		journal.write("Застосування пакета", "Помилка", str(error), package=name)
+		return None
 
 
 @frappe.whitelist()
@@ -114,3 +153,11 @@ def rebuild_calendar(year, confirm_past=0):
 		return build_holiday_list(int(year), confirm_past=bool(int(confirm_past or 0)))
 	except PastDatesChange as error:
 		return {"needs_confirmation": str(error)}
+
+
+@frappe.whitelist()
+def get_update_warnings():
+	"""Чинні попередження для розділу «Законодавство» й картки пакета (FR-038)."""
+	from ua_compliance.packages.jobs import current_warnings
+
+	return current_warnings()

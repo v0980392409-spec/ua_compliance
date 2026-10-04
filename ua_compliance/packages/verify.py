@@ -52,7 +52,7 @@ def inspect_signatures(raw: bytes):
 	return {"manifest": manifest, "manifest_hash": sha256(manifest_bytes), "key_ids": sorted(key_ids)}
 
 
-def verify(raw: bytes, last_applied_version=None):
+def verify(raw: bytes, last_applied_version=None, allow_expired=False):
 	"""Повертає словник з маніфестом, підписами й розібраними даними.
 
 	Кидає PackageError з текстом відмови, якщо хоч одна перевірка не пройдена.
@@ -91,7 +91,9 @@ def verify(raw: bytes, last_applied_version=None):
 	expires = manifest.get("expires")
 	if not expires:
 		raise PackageError("Пакет не прийнято: у маніфесті немає строку придатності")
-	if getdate(expires) < getdate(today()):
+	# Блокування за строком знімає лише адміністратор явною дією (FR-037) — тоді й тільки
+	# тоді прострочений маніфест не зупиняє перевірку; решта перевірок діє як завжди.
+	if getdate(expires) < getdate(today()) and not allow_expired:
 		raise PackageError(
 			f"Пакет не прийнято: строк придатності маніфесту минув {getdate(expires).strftime('%d.%m.%Y')}"
 		)

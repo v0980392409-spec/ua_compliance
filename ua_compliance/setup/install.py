@@ -38,11 +38,13 @@ CURRENCY_EXCHANGE_FIELDS = {
 
 def after_install():
 	setup_fields()
+	setup_warnings_block()
 	disable_external_rate_provider()
 
 
 def after_migrate():
 	setup_fields()
+	setup_warnings_block()
 	# Постачальник вимикається і на міграції, а не лише на встановленні: якщо його
 	# знову увімкнули, документи почнуть рахувати за неофіційним курсом мовчки.
 	# Факт вимкнення пишемо в журнал, щоб дія не була невидимою.
@@ -101,3 +103,32 @@ def _log_provider_disabled():
 			"triggered_by": "Administrator",
 		}
 	).insert(ignore_permissions=True)
+
+
+WARNINGS_BLOCK = "Попередження законодавства"
+WARNINGS_HTML = '<div class="ua-warnings alert alert-warning" style="display:none;margin:0"></div>'
+# Блок показує ті самі попередження, що й журнал і картка пакета (FR-038); коли їх немає,
+# він ховається й не займає місця в розділі.
+WARNINGS_SCRIPT = """
+frappe.call("ua_compliance.api.get_update_warnings").then(({ message }) => {
+	const box = root_element.querySelector(".ua-warnings");
+	if (!message || !message.length) return;
+	box.innerHTML = message.map((text) => "<div>" + frappe.utils.escape_html(text) + "</div>").join("");
+	box.style.display = "block";
+});
+"""
+
+
+def setup_warnings_block():
+	"""Блок попереджень у розділі «Законодавство». Custom HTML Block не має файла модуля,
+	тож заводимо його тут, ідемпотентно."""
+	values = {"html": WARNINGS_HTML, "script": WARNINGS_SCRIPT, "style": "", "private": 0}
+	if frappe.db.exists("Custom HTML Block", WARNINGS_BLOCK):
+		block = frappe.get_doc("Custom HTML Block", WARNINGS_BLOCK)
+		block.update(values)
+		block.save(ignore_permissions=True)
+		return
+	block = frappe.new_doc("Custom HTML Block")
+	block.update(values)
+	block.set("__newname", WARNINGS_BLOCK)  # ім'я задається вручну (autoname: prompt)
+	block.insert(ignore_permissions=True)

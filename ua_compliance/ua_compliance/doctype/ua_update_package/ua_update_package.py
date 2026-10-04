@@ -25,6 +25,8 @@ APPROVER_ROLE = "Відповідальний за законодавство"
 # не зберігається (спіймано харнесом 02.10.2026 на 32 000 кодів КАТОТТГ).
 PREVIEW_LIMIT = 200
 FINAL_STATES = ("Застосовано",)
+DECISION_ACCEPT = "Прийняти з пакета"
+DECISION_KEEP = "Залишити ручне"
 
 
 class UAUpdatePackage(Document):
@@ -78,7 +80,11 @@ class UAUpdatePackage(Document):
 		Без збігу захист від відкоту рахував би версію по чужому каналу, а застосування
 		пішло б не тим шляхом: класифікатор розібрали б як параметри.
 		"""
-		result = package_verify.verify(raw, package_verify.last_applied_version(self.channel_code))
+		result = package_verify.verify(
+			raw,
+			package_verify.last_applied_version(self.channel_code),
+			allow_expired=bool(self.expiry_override),
+		)
 		manifest_channel = result["manifest"].get("channel")
 		if manifest_channel != self.channel_code:
 			raise PackageError(
@@ -125,7 +131,9 @@ class UAUpdatePackage(Document):
 			self.notes = (self.notes or "") + _(
 				"\nЗмін усього: {0}, у передпоказі показано перші {1}"
 			).format(total, len(shown))
-		self.state = "До застосування"
+		# «Перевірено» — перевірки пройдені, але є розходження з ручними записами, які
+		# чекають рішення людини; без них пакет одразу готовий до затвердження (FR-029).
+		self.state = "Перевірено" if self.undecided_conflicts() else "До застосування"
 		self.save_by_action()
 		journal.write(
 			"Приймання пакета",
@@ -137,43 +145,121 @@ class UAUpdatePackage(Document):
 		)
 		return True
 
-	def approve_and_apply(self, raw):
-		"""Затвердження людиною і застосування однією транзакцією."""
+	def approve(self):
+		"""Затвердження людиною: «До застосування» → «Затверджено» (FR-029, FR-030).
+
+		Саме застосування — окремий крок (`apply`), у фоновому завданні після фіксації
+		затвердження: так затвердження лишається слідом рішення, навіть якщо застосування
+		впаде, а пакет можна відхилити й після невдалої спроби.
+		"""
 		if APPROVER_ROLE not in frappe.get_roles() and frappe.session.user != "Administrator":
 			frappe.throw(_("Затверджувати пакет може лише роль «{0}»").format(APPROVER_ROLE))
-		if self.state != "До застосування":
-			frappe.throw(_("Пакет у стані «{0}» не затверджується").format(self.state))
-
-		conflicts = [row for row in self.preview if row.conflict]
-		if conflicts:
+		undecided = self.undecided_conflicts()
+		if undecided:
 			frappe.throw(
 				_("Є розходження з записами, введеними вручну ({0}). Прийміть рішення по кожному").format(
-					", ".join(sorted({row.code for row in conflicts}))
+					", ".join(sorted({row.code for row in undecided}))
 				)
 			)
+		if self.state != "До застосування":
+			frappe.throw(_("Пакет у стані «{0}» не затверджується").format(self.state))
+		self.state = "Затверджено"
+		self.approved_by = frappe.session.user
+		self.approved_on = now_datetime()
+		self.save_by_action()
 
+	def apply(self, raw):
+		"""Застосування затвердженого пакета однією транзакцією (FR-033): «Затверджено» → «Застосовано»."""
+		if self.state != "Затверджено":
+			frappe.throw(_("Застосовується лише затверджений пакет, а цей у стані «{0}»").format(self.state))
 		started = now_datetime()
 		result = self._verify(raw)
 		reference = f"{self.channel} {self.version}"
+		# Код, за яким людина вирішила залишити ручний запис, пакет не чіпає зовсім:
+		# і закриття ручного періоду, і новий період з пакета пропускаються разом,
+		# інакше новий період перетнувся б із залишеним ручним (FR-017).
+		keep_manual = self.codes_kept_manual()
+		rows = [row for row in result["rows"] if row.get("code") not in keep_manual]
 		if self.channel_code == "classifiers":
-			summary = package_apply.apply_classifiers(result["rows"], reference)
+			summary = package_apply.apply_classifiers(rows, reference)
 		else:
-			summary = package_apply.apply_parameters(result["rows"], reference)
+			summary = package_apply.apply_parameters(rows, reference)
 
 		self.state = "Застосовано"
-		self.approved_by = frappe.session.user
-		self.approved_on = now_datetime()
 		self.applied_on = now_datetime()
 		self.save_by_action()
+		kept = f"; залишено ручні: {', '.join(sorted(keep_manual))}" if keep_manual else ""
 		journal.write(
 			"Застосування пакета",
 			"Успішно",
-			f"Створено {summary['created']}, закрито {summary['closed']}, оновлено {summary['updated']}",
+			f"Створено {summary['created']}, закрито {summary['closed']}, оновлено {summary['updated']}{kept}",
 			package=self.name,
 			started_at=started,
 			counts={"created": summary["created"], "updated": summary["updated"] + summary["closed"]},
 		)
 		return summary
+
+	def approve_and_apply(self, raw):
+		"""Затвердження й застосування одним викликом — для перевірок і внутрішніх шляхів."""
+		self.approve()
+		return self.apply(raw)
+
+	def decide(self, decisions):
+		"""Рішення людини щодо розходжень із ручними записами (US3/AC8, FR-032).
+
+		decisions — {назва рядка передпоказу: «Прийняти з пакета» | «Залишити ручне»}.
+		Коли вирішено всі розходження, пакет переходить у «До застосування».
+		"""
+		if APPROVER_ROLE not in frappe.get_roles() and frappe.session.user != "Administrator":
+			frappe.throw(_("Вирішувати розходження може лише роль «{0}»").format(APPROVER_ROLE))
+		if self.state not in ("Перевірено", "До застосування"):
+			frappe.throw(_("Пакет у стані «{0}» не чекає рішень").format(self.state))
+		allowed = (DECISION_ACCEPT, DECISION_KEEP)
+		taken = []
+		for row in self.preview:
+			if not row.conflict or row.name not in decisions:
+				continue
+			decision = decisions[row.name]
+			if decision not in allowed:
+				frappe.throw(_("Невідоме рішення «{0}»").format(decision))
+			row.decision = decision
+			row.decided_by = frappe.session.user
+			taken.append(f"{row.code} з {frappe.utils.formatdate(row.valid_from)}: {decision}")
+		if not taken:
+			frappe.throw(_("Не вибрано жодного рішення"))
+		if not self.undecided_conflicts():
+			self.state = "До застосування"
+		self.save_by_action()
+		journal.write("Рішення щодо пакета", "Успішно", "; ".join(taken), package=self.name)
+		return self.state
+
+	def unlock_expired(self, raw):
+		"""Зняття блокування за строком придатності адміністратором (FR-037, US3/AC6).
+
+		Для ізольованого контуру, куди свіжий пакет не дістається вчасно. Дія явна,
+		лишає слід у журналі, а пакет проходить перевірку знову — без відмови за строком.
+		"""
+		if not ({"System Manager", "Administrator"} & set(frappe.get_roles())):
+			frappe.throw(_("Зняти блокування за строком може лише адміністратор"))
+		if self.state != "Відхилено" or "строк придатності маніфесту минув" not in (self.reject_reason or ""):
+			frappe.throw(_("Пакет не заблоковано за строком придатності"))
+		previous_reason = self.reject_reason
+		self.expiry_override = 1
+		self.expiry_override_by = frappe.session.user
+		self.reject_reason = None
+		journal.write(
+			"Рішення щодо пакета",
+			"Успішно",
+			f"Знято блокування за строком придатності ({previous_reason})",
+			package=self.name,
+		)
+		return self.run_verification(raw)
+
+	def undecided_conflicts(self):
+		return [row for row in self.preview if row.conflict and not row.decision]
+
+	def codes_kept_manual(self):
+		return {row.code for row in self.preview if row.conflict and row.decision == DECISION_KEEP}
 
 
 def receive(raw: bytes, channel_code: str, version, file_name=""):

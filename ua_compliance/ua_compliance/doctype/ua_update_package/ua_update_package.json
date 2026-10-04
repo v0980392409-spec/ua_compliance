@@ -8,6 +8,7 @@
  "editable_grid": 1,
  "engine": "InnoDB",
  "field_order": [
+  "tab_general",
   "channel",
   "channel_code",
   "version",
@@ -22,18 +23,27 @@
   "key_ids",
   "col_sign",
   "notes",
-  "sec_files",
-  "files",
-  "sec_preview",
-  "preview",
   "sec_result",
   "reject_reason",
+  "expiry_override",
+  "expiry_override_by",
   "approved_by",
   "col_result",
   "approved_on",
-  "applied_on"
+  "applied_on",
+  "tab_files",
+  "sec_files",
+  "files",
+  "tab_preview",
+  "sec_preview",
+  "preview"
  ],
  "fields": [
+  {
+   "fieldname": "tab_general",
+   "fieldtype": "Tab Break",
+   "label": "\u0417\u0430\u0433\u0430\u043b\u044c\u043d\u0435"
+  },
   {
    "fieldname": "channel",
    "fieldtype": "Select",
@@ -124,30 +134,6 @@
    "read_only": 1
   },
   {
-   "fieldname": "sec_files",
-   "fieldtype": "Section Break",
-   "label": "\u0424\u0430\u0439\u043b\u0438"
-  },
-  {
-   "fieldname": "files",
-   "fieldtype": "Table",
-   "label": "\u0424\u0430\u0439\u043b\u0438",
-   "options": "UA Update Package File",
-   "read_only": 1
-  },
-  {
-   "fieldname": "sec_preview",
-   "fieldtype": "Section Break",
-   "label": "\u0429\u043e \u0437\u043c\u0456\u043d\u0438\u0442\u044c\u0441\u044f"
-  },
-  {
-   "fieldname": "preview",
-   "fieldtype": "Table",
-   "label": "\u0417\u043c\u0456\u043d\u0438",
-   "options": "UA Update Package Change",
-   "read_only": 1
-  },
-  {
    "fieldname": "sec_result",
    "fieldtype": "Section Break",
    "label": "\u0420\u0456\u0448\u0435\u043d\u043d\u044f"
@@ -157,6 +143,21 @@
    "fieldname": "reject_reason",
    "fieldtype": "Small Text",
    "label": "\u041f\u0440\u0438\u0447\u0438\u043d\u0430 \u0432\u0456\u0434\u0445\u0438\u043b\u0435\u043d\u043d\u044f"
+  },
+  {
+   "fieldname": "expiry_override",
+   "fieldtype": "Check",
+   "label": "\u0411\u043b\u043e\u043a\u0443\u0432\u0430\u043d\u043d\u044f \u0437\u0430 \u0441\u0442\u0440\u043e\u043a\u043e\u043c \u0437\u043d\u044f\u0442\u043e",
+   "read_only": 1,
+   "depends_on": "expiry_override"
+  },
+  {
+   "fieldname": "expiry_override_by",
+   "fieldtype": "Link",
+   "label": "\u0417\u043d\u044f\u0432 \u0431\u043b\u043e\u043a\u0443\u0432\u0430\u043d\u043d\u044f",
+   "options": "User",
+   "read_only": 1,
+   "depends_on": "expiry_override"
   },
   {
    "fieldname": "approved_by",
@@ -182,12 +183,46 @@
    "label": "\u0417\u0430\u0441\u0442\u043e\u0441\u043e\u0432\u0430\u043d\u043e",
    "read_only": 1,
    "in_list_view": 1
+  },
+  {
+   "fieldname": "tab_files",
+   "fieldtype": "Tab Break",
+   "label": "\u0424\u0430\u0439\u043b\u0438"
+  },
+  {
+   "fieldname": "sec_files",
+   "fieldtype": "Section Break",
+   "label": "\u0424\u0430\u0439\u043b\u0438"
+  },
+  {
+   "fieldname": "files",
+   "fieldtype": "Table",
+   "label": "\u0424\u0430\u0439\u043b\u0438",
+   "options": "UA Update Package File",
+   "read_only": 1
+  },
+  {
+   "fieldname": "tab_preview",
+   "fieldtype": "Tab Break",
+   "label": "\u0429\u043e \u0437\u043c\u0456\u043d\u0438\u0442\u044c\u0441\u044f"
+  },
+  {
+   "fieldname": "sec_preview",
+   "fieldtype": "Section Break",
+   "label": "\u0429\u043e \u0437\u043c\u0456\u043d\u0438\u0442\u044c\u0441\u044f"
+  },
+  {
+   "fieldname": "preview",
+   "fieldtype": "Table",
+   "label": "\u0417\u043c\u0456\u043d\u0438",
+   "options": "UA Update Package Change",
+   "read_only": 1
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-10-03 21:47:35.000000",
+ "modified": "2026-10-04 10:14:19.000000",
  "modified_by": "Administrator",
  "module": "UA Compliance",
  "name": "UA Update Package",

@@ -82,34 +82,49 @@ def _take(raw, asset):
 	return package.name
 
 
-def warn_about_updates():
-	"""Три попередження з контракту (FR-038). Мовчазної давнини не буває."""
+def current_warnings():
+	"""Попередження, які зараз чинні (FR-038, крайній випадок «джерело недоступне»).
+
+	Одна функція на всіх: щоденне завдання пише їх у журнал, а форма пакета й розділ
+	«Законодавство» показують людині — так текст не розходиться між місцями.
+	"""
 	settings = frappe.get_single("UA Compliance Settings")
-	if not settings.packages_enabled:
-		return
-
 	warnings = []
+	if settings.packages_enabled:
+		warnings += _package_warnings(settings)
+	if settings.rates_enabled:
+		warnings += rate_failure_warnings(settings)
+	return warnings
 
+
+def _package_warnings(settings):
+	warnings = []
 	threshold = int(settings.stale_warning_days or 45)
 	last_applied = frappe.get_all(
 		"UA Update Package",
 		filters={"state": "Застосовано"},
-		fields=["applied_on"],
+		fields=["applied_on", "expires_on"],
 		order_by="applied_on desc",
 		limit=1,
 	)
 	if not last_applied:
 		warnings.append("Оновлення законодавства ще жодного разу не застосовувалися")
-	elif getdate(last_applied[0].applied_on) < getdate(add_days(today(), -threshold)):
-		days = (getdate(today()) - getdate(last_applied[0].applied_on)).days
-		warnings.append(f"Оновлення законодавства не надходили {days} днів")
+	else:
+		if getdate(last_applied[0].applied_on) < getdate(add_days(today(), -threshold)):
+			days = (getdate(today()) - getdate(last_applied[0].applied_on)).days
+			warnings.append(f"Оновлення законодавства не надходили {days} днів")
+		# Строк придатності останнього застосованого маніфесту — видавець обіцяв новий
+		# пакет до цієї дати; минула, а нового немає — дані, ймовірно, застаріли.
+		expires = last_applied[0].expires_on
+		if expires and getdate(expires) < getdate(today()):
+			warnings.append(f"Строк придатності останнього пакета минув {getdate(expires).strftime('%d.%m.%Y')}")
 
 	expired = frappe.get_all(
 		"UA Update Package",
 		# Frappe підставляє замість порожньої дати 0001-01-01: без «is set» пакет без строку
 		# (щойно заведений, ще не перевірений) вважався б простроченим.
 		filters=[
-			["state", "in", ["Отримано", "До застосування"]],
+			["state", "in", ["Отримано", "Перевірено", "До застосування"]],
 			["expires_on", "is", "set"],
 			["expires_on", "<", today()],
 		],
@@ -118,7 +133,9 @@ def warn_about_updates():
 	for name in expired:
 		warnings.append(f"Строк придатності пакета {name} минув")
 
-	waiting = frappe.get_all("UA Update Package", filters={"state": "До застосування"}, pluck="name")
+	waiting = frappe.get_all(
+		"UA Update Package", filters={"state": ["in", ["Перевірено", "До застосування"]]}, pluck="name"
+	)
 	for name in waiting:
 		due = frappe.get_all(
 			"UA Update Package Change",
@@ -127,7 +144,31 @@ def warn_about_updates():
 		)
 		if due:
 			warnings.append(f"Є непримінений пакет {name}, дата дії якого вже настала")
+	return warnings
 
+
+def rate_failure_warnings(settings=None):
+	"""Курс не завантажується N разів поспіль — попередити відповідального (крайній випадок спеки)."""
+	settings = settings or frappe.get_single("UA Compliance Settings")
+	limit = int(settings.rates_failure_warning or 0)
+	if limit <= 0:
+		return []
+	last = frappe.get_all(
+		"UA Operation Log",
+		filters={"kind": "Завантаження курсу"},
+		fields=["result", "message"],
+		order_by="started_at desc, creation desc",
+		limit=limit,
+	)
+	if len(last) == limit and all(row.result == "Помилка" for row in last):
+		reason = (last[0].message or "").splitlines()[0][:200]
+		return [f"Курс НБУ не завантажується {limit} разів поспіль: {reason}"]
+	return []
+
+
+def warn_about_updates():
+	"""Щоденне завдання: чинні попередження — у журнал. Мовчазної давнини не буває."""
+	warnings = current_warnings()
 	if warnings:
 		# Попередження — не збій приймання: свій вид і результат «Увага», щоб журнал не
 		# лякав щоденною «Помилкою» там, де нічого не зламалося.
