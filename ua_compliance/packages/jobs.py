@@ -97,9 +97,15 @@ def current_warnings():
 	return warnings
 
 
+def stale_threshold(settings):
+	"""Поріг давності в днях. 0 — законне значення («попереджати одразу»), тож не
+	«or 45»: так нуль мовчки ставав 45 (спіймано на перевірці на екрані 04.10.2026)."""
+	return frappe.utils.cint(settings.stale_warning_days)
+
+
 def _package_warnings(settings):
 	warnings = []
-	threshold = int(settings.stale_warning_days or 45)
+	threshold = stale_threshold(settings)
 	last_applied = frappe.get_all(
 		"UA Update Package",
 		filters={"state": "Застосовано"},

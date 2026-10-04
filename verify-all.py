@@ -1136,6 +1136,15 @@ chk(
 	not frappe.get_meta("Currency Exchange").get_field("to_currency").in_list_view,
 )
 
+# Поріг давності 0 — «попереджати одразу», а не «за умовчанням 45»
+from ua_compliance.packages.jobs import stale_threshold
+
+chk(
+	"поріг давності 0 діє як нуль, а не як 45",
+	stale_threshold(frappe._dict(stale_warning_days=0)) == 0
+	and stale_threshold(frappe._dict(stale_warning_days=45)) == 45,
+)
+
 # T067 і T065: картка пакета вкладками, блок попереджень у розділі
 package_meta = frappe.get_meta("UA Update Package")
 chk(
