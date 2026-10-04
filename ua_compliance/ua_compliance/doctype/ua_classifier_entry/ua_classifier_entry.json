@@ -41,7 +41,8 @@
    "fieldtype": "Data",
    "in_list_view": 1,
    "label": "\u041d\u0430\u0439\u043c\u0435\u043d\u0443\u0432\u0430\u043d\u043d\u044f",
-   "reqd": 1
+   "reqd": 1,
+   "length": 255
   },
   {
    "fieldname": "col_1",
@@ -80,7 +81,7 @@
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-10-02 22:56:45.202304",
+ "modified": "2026-10-04 15:41:26.000000",
  "modified_by": "Administrator",
  "module": "UA Compliance",
  "name": "UA Classifier Entry",

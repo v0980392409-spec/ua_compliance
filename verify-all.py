@@ -1190,6 +1190,17 @@ try:
 except frappe.ValidationError as error:
 	chk("посилання на норму без https:// не приймається", "https://" in str(error), str(error)[:90])
 
+# Найдовша офіційна назва КВЕД — 153 символи (47.43); стандартні 140 у Data її обрізали б
+# з помилкою вставки (спіймано на репетиції першого пакета класифікаторів 04.10.2026)
+_entry_len = frappe.db.sql(
+	"select character_maximum_length from information_schema.columns where table_name='tabUA Classifier Entry' and column_name='entry_name' and table_schema=database()"
+)
+chk(
+	"назва коду класифікатора вміщує 255 символів",
+	bool(_entry_len) and int(_entry_len[0][0]) >= 255,
+	str(_entry_len),
+)
+
 # T067 і T065: картка пакета вкладками, блок попереджень у розділі
 package_meta = frappe.get_meta("UA Update Package")
 chk(
