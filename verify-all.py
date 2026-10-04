@@ -1137,6 +1137,33 @@ chk(
 	and all(log_meta.get_field(f).in_standard_filter for f in ("kind", "result")),
 )
 
+# 12а-2в. Список класифікаторів (екран 9; демо 04.10.2026: КВЕД заступав КАТОТТГ на перших
+# сторінках). Швидкий фільтр «Класифікатор» платформа будує з ознаки поля, а скрипт списку
+# ховає технічний ідентифікатор — читаємо його тим самим завантажувачем, що й браузер.
+cls_meta = frappe.get_meta("UA Classifier Entry")
+chk(
+	"список класифікаторів: швидкі фільтри «Класифікатор» і «Код», заголовок — назва, сортування за кодом",
+	cls_meta.get_field("classifier").in_standard_filter
+	and cls_meta.get_field("code").in_standard_filter
+	and cls_meta.title_field == "entry_name"
+	and cls_meta.sort_field == "code",
+)
+from frappe.desk.form.meta import get_meta as get_form_meta
+
+cls_list_js = get_form_meta("UA Classifier Entry", cached=False).get("__list_js") or ""
+chk(
+	"скрипт списку класифікаторів підхоплено платформою: технічний ідентифікатор прихований",
+	"hide_name_filter: true" in cls_list_js and "hide_name_column: true" in cls_list_js,
+	f"{len(cls_list_js)} символів",
+)
+cls_values = set(frappe.get_all("UA Classifier Entry", pluck="classifier", group_by="classifier"))
+cls_options = set(cls_meta.get_field("classifier").options.split("\n"))
+chk(
+	"кожне значення «Класифікатор» у даних є варіантом швидкого фільтра",
+	cls_values <= cls_options,
+	", ".join(sorted(cls_values - cls_options)) or ", ".join(sorted(cls_values)),
+)
+
 # 12а-3. Кожен доктайп і звіт застосунку має український підпис (спіймано на демо:
 # «UA Holiday Rule» і «UA-Норма робочого часу» в заголовках)
 _lang = frappe.local.lang
