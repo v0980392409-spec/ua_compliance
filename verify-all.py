@@ -1132,6 +1132,35 @@ except frappe.ValidationError:
 frappe.clear_messages()
 chk("ДК 003 деревом не показується — за контрактом він списком", tree_refused)
 
+# Лише читання незалежно від ролі (FR-048) — перевіряємо від імені Адміністратора, який
+# оминає DocPerm: на екрані 04.10.2026 картка показувала йому «Зберегти».
+edited = frappe.get_doc("UA Classifier Entry", TEST_DISTRICT)
+edited.entry_name = "Перейменовано вручну"
+try:
+	edited.save()
+	edit_refused = False
+except frappe.ValidationError:
+	edit_refused = True
+frappe.clear_messages()
+try:
+	frappe.delete_doc("UA Classifier Entry", TEST_COMMUNITY)
+	delete_refused = False
+except frappe.ValidationError:
+	delete_refused = True
+frappe.clear_messages()
+chk(
+	"код класифікатора не правиться й не видаляється навіть Адміністратором (FR-048, FR-049)",
+	edit_refused
+	and delete_refused
+	and frappe.db.get_value("UA Classifier Entry", TEST_DISTRICT, "entry_name") == "Тестовий район"
+	and frappe.db.exists("UA Classifier Entry", TEST_COMMUNITY)
+	and not frappe.get_meta("UA Classifier Entry").allow_rename
+	and not frappe.get_meta("UA Classifier Entry").allow_bulk_edit,
+	f"правка відхилена {edit_refused}, видалення відхилене {delete_refused}",
+)
+cls_form_js = get_tree_form_meta("UA Classifier Entry", cached=False).get("__js") or ""
+chk("картка коду класифікатора відкривається лише для читання", "frm.disable_form()" in cls_form_js)
+
 orphans = frappe.db.sql(
 	"""select count(*) from `tabUA Classifier Entry` c
 	left join `tabUA Classifier Entry` p on p.name = concat(c.classifier, '-', c.parent_code)

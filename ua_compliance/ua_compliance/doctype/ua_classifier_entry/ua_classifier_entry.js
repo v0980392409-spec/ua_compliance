@@ -1,8 +1,10 @@
-// Copyright (c) 2026, Riverside and contributors
-// For license information, please see license.txt
+// Картка коду класифікатора — лише читання для всіх, зокрема для Адміністратора (FR-048).
+// Без цього Адміністратор бачив редаговані поля й «Зберегти» (перевірка на екрані
+// 04.10.2026); межа однаково тримається на сервері, тут — лише щоб не пропонувати
+// дію, яку сервер відхилить.
 
-// frappe.ui.form.on("UA Classifier Entry", {
-// 	refresh(frm) {
-
-// 	},
-// });
+frappe.ui.form.on("UA Classifier Entry", {
+	refresh(frm) {
+		frm.disable_form();
+	},
+});
