@@ -38,7 +38,9 @@ frappe.treeview_settings["UA Classifier Entry"] = {
 	// КВЕД читають кодом («62.01 Комп'ютерне програмування»), КАТОТТГ — назвою, а
 	// дев'ятнадцятизначний код лише довідково, сірим. Закритий код — сірим і
 	// перекресленим (контракт, екран 9): з дерева він не зникає, бо класифікатор не
-	// видаляє записів (FR-049).
+	// видаляє записів (FR-049). Сірий — text-extra-muted: у desk Frappe 16 звичайний
+	// текст уже має колір --text-muted, і клас text-muted нічого не приглушує
+	// (спіймано на перевірці на екрані 04.10.2026).
 	get_label(node) {
 		const data = node.data || {};
 		if (node.is_root || !data.code) {
@@ -47,9 +49,9 @@ frappe.treeview_settings["UA Classifier Entry"] = {
 		const title = frappe.utils.escape_html(data.title);
 		const code = frappe.utils.escape_html(data.code);
 		const html =
-			data.classifier === "КВЕД" ? `${code} ${title}` : `${title} <span class="text-muted">${code}</span>`;
+			data.classifier === "КВЕД" ? `${code} ${title}` : `${title} <span class="text-extra-muted">${code}</span>`;
 		if (data.valid_to && data.valid_to < frappe.datetime.get_today()) {
-			return `<s class="text-muted">${html}</s>`;
+			return `<s class="text-extra-muted">${html}</s>`;
 		}
 		return html;
 	},
