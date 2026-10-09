@@ -46,6 +46,7 @@ function build(year, confirm_past) {
 				title: message.title,
 				indicator: "green",
 				message: __("Днів відпочинку: {0}, з них свят: {1}.", [message.total, message.holidays]) +
+					(message.transferred ? "<br>" + __("Перенесених вихідних: {0}.", [message.transferred]) : "") +
 					(message.martial_law ? "<br>" + __("Воєнний стан: свята не є вихідними.") : "") +
 					"<br>" + `<a href="/app/holiday-list/${encodeURIComponent(message.title)}">` +
 					__("Відкрити календар") + "</a>",

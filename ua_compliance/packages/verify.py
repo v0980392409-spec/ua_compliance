@@ -119,12 +119,11 @@ def verify(raw: bytes, last_applied_version=None, allow_expired=False):
 	channel_code = manifest.get("channel")
 	if channel_code not in package_parse.CHANNEL_BY_CODE:
 		raise PackageError(f"Пакет не прийнято: невідомий канал {channel_code}")
-	if channel_code == "calendar":
-		raise PackageError(f"Пакет не прийнято: канал {channel_code} ще не підтримується")
-
-	parser = (
-		package_parse.parse_parameters if channel_code == "parameters" else package_parse.parse_classifiers
-	)
+	parser = {
+		"parameters": package_parse.parse_parameters,
+		"calendar": package_parse.parse_holidays,
+		"classifiers": package_parse.parse_classifiers,
+	}[channel_code]
 
 	rows = []
 	for entry in declared:

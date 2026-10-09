@@ -182,6 +182,10 @@ class UAUpdatePackage(Document):
 		rows = [row for row in result["rows"] if row.get("code") not in keep_manual]
 		if self.channel_code == "classifiers":
 			summary = package_apply.apply_classifiers(rows, reference)
+		elif self.channel_code == "calendar":
+			from ua_compliance.packages import holidays
+
+			summary = holidays.apply(rows, reference)
 		else:
 			summary = package_apply.apply_parameters(rows, reference)
 

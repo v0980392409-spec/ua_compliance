@@ -8,6 +8,10 @@ def build(rows, channel_code="parameters"):
 	"""Повертає список рядків передпоказу для таблиці пакета."""
 	if channel_code == "classifiers":
 		return build_classifiers(rows)
+	if channel_code == "calendar":
+		from ua_compliance.packages import holidays
+
+		return holidays.preview(rows)
 	changes = []
 	for row in rows:
 		code, valid_from = row["code"], getdate(row["valid_from"])

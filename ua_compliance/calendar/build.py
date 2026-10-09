@@ -14,9 +14,9 @@ from frappe.utils import getdate, today
 
 from ua_compliance.api import get_parameter
 from ua_compliance.calendar.easter import TRINITY_OFFSET, orthodox_easter
+from ua_compliance.calendar.rules import compose_days_off
 
 MARTIAL_LAW_CODE = "MARTIAL_LAW"
-WEEKEND_WEEKDAYS = (5, 6)  # субота і неділя
 
 
 class PastDatesChange(frappe.ValidationError):
@@ -62,20 +62,6 @@ def holidays_for_year(year: int):
 	return sorted(result)
 
 
-def merge_same_dates(entries):
-	"""Свята, що збіглися в одну дату, — один рядок з обома назвами.
-
-	Штатний календар не приймає повторну дату, а збіг буває: Великдень 01.05.2016
-	припав на День праці. Перенесення в такому разі не виникає — день один.
-	"""
-	names_by_date = {}
-	for occurrence, name, _off in entries:
-		names = names_by_date.setdefault(occurrence, [])
-		if name not in names:
-			names.append(name)
-	return [(occurrence, "; ".join(names), True) for occurrence, names in sorted(names_by_date.items())]
-
-
 def build_holiday_list(year: int, title=None, confirm_past=False, martial_law_code=MARTIAL_LAW_CODE):
 	"""Збирає штатний календар вихідних на рік. Повертає зведення.
 
@@ -84,24 +70,25 @@ def build_holiday_list(year: int, title=None, confirm_past=False, martial_law_co
 	"""
 	title = title or _("Робочий календар {0}").format(year)
 	start, end = date(year, 1, 1), date(year, 12, 31)
+	# Ознака на початок року лишається умовою: невідома — значить, будувати не з чого.
 	martial_law = martial_law_active(start, martial_law_code)
 
-	entries = []
-	current = start
-	while current <= end:
-		if current.weekday() in WEEKEND_WEEKDAYS:
-			entries.append((current, _("Вихідний день"), True))
-		current += timedelta(days=1)
-
-	for occurrence, name, is_day_off in holidays_for_year(year):
-		# У воєнний стан свята не є вихідними (Закон 2136-IX), і перенесення не застосовується.
-		if martial_law or not is_day_off:
-			continue
-		if occurrence.weekday() in WEEKEND_WEEKDAYS:
-			continue
-		entries.append((occurrence, name, True))
-
-	entries = merge_same_dates(entries)
+	# Воєнний стан звіряється на дату кожного свята: якщо він закінчиться посеред року,
+	# свята після цієї дати знову вихідні (спека, крайні випадки US4). Свято на вихідний
+	# поза воєнним станом переносить вихідний (ч. 3 ст. 67 КЗпП) — див. compose_days_off.
+	weekly_off = _("Вихідний день")
+	entries, kinds = [], {}
+	for occurrence, kind, names in compose_days_off(
+		year, holidays_for_year(year), lambda day: martial_law_active(day, martial_law_code)
+	):
+		if kind == "weekend":
+			description = weekly_off
+		elif kind == "transfer":
+			description = _("Перенесений вихідний: {0}").format("; ".join(names))
+		else:
+			description = "; ".join(names)
+		entries.append((occurrence, description, kind == "weekend"))
+		kinds[kind] = kinds.get(kind, 0) + 1
 	existing = frappe.db.exists("Holiday List", title)
 	if existing:
 		doc = frappe.get_doc("Holiday List", title)
@@ -123,13 +110,13 @@ def build_holiday_list(year: int, title=None, confirm_past=False, martial_law_co
 
 	doc.from_date = start
 	doc.to_date = end
-	for occurrence, name, _off in entries:
+	for occurrence, name, is_weekly_off in entries:
 		doc.append(
 			"holidays",
 			{
 				"holiday_date": occurrence,
 				"description": name,
-				"weekly_off": 1 if name == _("Вихідний день") else 0,
+				"weekly_off": 1 if is_weekly_off else 0,
 			},
 		)
 	doc.save(ignore_permissions=True)
@@ -138,16 +125,18 @@ def build_holiday_list(year: int, title=None, confirm_past=False, martial_law_co
 		"title": title,
 		"total": len(entries),
 		"martial_law": martial_law,
-		"holidays": len([e for e in entries if e[1] != _("Вихідний день")]),
+		"holidays": kinds.get("holiday", 0),
+		"transferred": kinds.get("transfer", 0),
 		"past_changed": len(touched_past) if existing else 0,
 	}
 	# Кожна побудова — у журналі; підтверджена зміна минулих дат названа окремо (FR-046).
 	from ua_compliance import journal
 
-	message = _("{0}: днів відпочинку {1}, з них свят {2}{3}").format(
+	message = _("{0}: днів відпочинку {1}, з них свят {2}, перенесених вихідних {3}{4}").format(
 		title,
 		summary["total"],
 		summary["holidays"],
+		summary["transferred"],
 		_(", воєнний стан — свята не вихідні") if martial_law else "",
 	)
 	if summary["past_changed"]:

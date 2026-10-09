@@ -1024,6 +1024,139 @@ chk(
 	f"робочих {norm['working_days']}, вихідних {days_off}, годин {norm['hours']}",
 )
 
+# 10а. Канал «Календар» (контракт пакета) і перенесення вихідного (ч. 3 ст. 67 КЗпП).
+# Місця в році — ті, де справжніх свят немає (13–15 листопада, Трійця +3): пакет-перевірка
+# не зачіпає робочих правил, які на екземплярах приїхали справжнім пакетом.
+CAL_HEADER = (
+	"holiday_name,rule_type,day,month,offset_days,is_day_off,valid_from,valid_to,"
+	"basis_type,basis_number,basis_date,basis_url\n"
+)
+
+
+def cal_line(name, rule_type, day, month, offset, valid_from, valid_to=""):
+	return (
+		f"{name},{rule_type},{day},{month},{offset},1,{valid_from},{valid_to},"
+		"Закон,322-VIII,1971-12-10,https://zakon.rada.gov.ua/laws/show/322-08\n"
+	)
+
+
+manual_15 = make_rule("Перевірка: ручне 15.11", 15, 11, valid_from="2020-01-01")
+keys_module.TRUSTED_KEYS[:] = [key_a, key_b, key_c]
+try:
+	cal_first = (
+		CAL_HEADER
+		+ cal_line("Перевірка пакета: субота", "Фіксована дата", 13, 11, "", "2015-01-01")
+		+ cal_line("Перевірка пакета: неділя", "Фіксована дата", 14, 11, "", "2015-01-01")
+		+ cal_line("Перевірка пакета: рухоме", "Трійця", "", "", 3, "2015-01-01")
+	)
+	raw_cal = build_package(cal_first, channel="calendar", keys=SIGNERS, version=V(20261201))
+	pkg_cal = receive(raw_cal, "calendar", V(20261201))
+	ok_cal = pkg_cal.run_verification(raw_cal)
+	chk(
+		"пакет каналу «Календар» проходить перевірку, передпоказ — за місцем свята в році",
+		ok_cal
+		and pkg_cal.state == "До застосування"
+		and sorted((r.code, r.action) for r in pkg_cal.preview)
+		== [("13.11", "Додається"), ("14.11", "Додається"), ("Трійця +3", "Додається")],
+		f"{pkg_cal.state} {pkg_cal.reject_reason or ''} {[(r.code, r.action) for r in pkg_cal.preview]}",
+	)
+	pkg_cal.approve_and_apply(raw_cal)
+	saved_rules = frappe.get_all(
+		"UA Holiday Rule", filters={"holiday_name": ["like", "Перевірка пакета:%"]}, fields=["holiday_name", "source"]
+	)
+	chk(
+		"правила свят застосовано пакетом",
+		len(saved_rules) == 3 and all(r.source == "З пакета" for r in saved_rules),
+		str(saved_rules),
+	)
+
+	# Друга редакція: 13.11 перейменовано з 2027 (закриття + додавання); ручне 15.11 «з 2020»
+	# перекривається з пакетним «з 2015» — розходження, пакет перебирає запис на себе
+	cal_second = (
+		CAL_HEADER
+		+ cal_line("Перевірка пакета: нова назва", "Фіксована дата", 13, 11, "", "2027-01-01")
+		+ cal_line("Перевірка пакета: понеділок", "Фіксована дата", 15, 11, "", "2015-01-01")
+	)
+	raw_cal2 = build_package(cal_second, channel="calendar", keys=SIGNERS, version=V(20261202))
+	pkg_cal2 = receive(raw_cal2, "calendar", V(20261202))
+	pkg_cal2.run_verification(raw_cal2)
+	preview2 = sorted((r.code, r.action, r.conflict) for r in pkg_cal2.preview)
+	chk(
+		"передпоказ: стара редакція закривається, ручне правило того ж місця — розходження",
+		preview2 == [("13.11", "Додається", 0), ("13.11", "Закривається", 0), ("15.11", "Змінюється", 1)]
+		and pkg_cal2.state == "Перевірено",
+		f"{preview2} {pkg_cal2.state}",
+	)
+	pkg_cal2.decide({r.name: "Прийняти з пакета" for r in pkg_cal2.undecided_conflicts()})
+	pkg_cal2.approve_and_apply(raw_cal2)
+	taken = frappe.db.get_value(
+		"UA Holiday Rule", manual_15.name, ["holiday_name", "source", "valid_from"], as_dict=True
+	)
+	old_13 = frappe.db.get_value("UA Holiday Rule", {"holiday_name": "Перевірка пакета: субота"}, "valid_to")
+	chk(
+		"після рішення ручне правило стало пакетним, а не задвоїлося; стара редакція закрита датою",
+		taken.source == "З пакета"
+		and str(taken.valid_from) == "2015-01-01"
+		and taken.holiday_name == "Перевірка пакета: понеділок"
+		and str(old_13) == "2026-12-31"
+		and frappe.db.count("UA Holiday Rule", {"day": 15, "month": 11}) == 1,
+		f"{taken} / {old_13}",
+	)
+
+	# Правило з пакета руками не правиться й не видаляється — навіть Адміністратором
+	from_pkg = frappe.get_doc("UA Holiday Rule", {"holiday_name": "Перевірка пакета: неділя"})
+	from_pkg.is_day_off = 0
+	try:
+		from_pkg.save()
+		rule_edited = True
+	except frappe.ValidationError:
+		rule_edited = False
+	frappe.clear_messages()
+	try:
+		frappe.delete_doc("UA Holiday Rule", from_pkg.name)
+		rule_deleted = True
+	except frappe.ValidationError:
+		rule_deleted = False
+	frappe.clear_messages()
+	chk(
+		"правило з пакета не правиться й не видаляється навіть Адміністратором",
+		not rule_edited and not rule_deleted and frappe.db.get_value("UA Holiday Rule", from_pkg.name, "is_day_off") == 1,
+		f"правка {rule_edited}, видалення {rule_deleted}",
+	)
+finally:
+	keys_module.TRUSTED_KEYS[:] = _production_keys
+
+# Перенесення: 13.11.2027 — субота, 14.11 — неділя, 15.11 — понеділок-свято, тож вихідні
+# переносяться на 16 і 17 листопада. 2024 — воєнний стан перевірки: перенесень немає.
+TITLE_TRANSFER = "Перевірка перенесення 2027"
+built_transfer = calendar_build.build_holiday_list(2027, title=TITLE_TRANSFER, martial_law_code=MARTIAL_CODE)
+transfer_rows = {
+	str(r.holiday_date): r.description
+	for r in frappe.get_all(
+		"Holiday",
+		filters={"parent": TITLE_TRANSFER, "holiday_date": ["between", ["2027-11-13", "2027-11-19"]]},
+		fields=["holiday_date", "description"],
+	)
+}
+chk(
+	"свято на вихідний переносить вихідний на наступний робочий день (ч. 3 ст. 67 КЗпП)",
+	transfer_rows.get("2027-11-15") == "Перевірка пакета: понеділок"
+	and transfer_rows.get("2027-11-16", "").startswith("Перенесений вихідний: Перевірка пакета: нова назва")
+	and transfer_rows.get("2027-11-17", "").startswith("Перенесений вихідний: Перевірка пакета: неділя")
+	and built_transfer["transferred"] >= 2,
+	str(transfer_rows),
+)
+built_war_transfer = calendar_build.build_holiday_list(
+	2024, title="Перевірка перенесення 2024", martial_law_code=MARTIAL_CODE
+)
+chk(
+	"у воєнний стан ні свят-вихідних, ні перенесень (ч. 6 ст. 6 Закону 2136-IX)",
+	built_war_transfer["martial_law"] is True
+	and built_war_transfer["holidays"] == 0
+	and built_war_transfer["transferred"] == 0,
+	str(built_war_transfer),
+)
+
 # 11. Звіт норми часу
 from frappe.desk.query_report import run as run_report
 

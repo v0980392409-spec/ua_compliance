@@ -62,14 +62,18 @@ HOLIDAYS = [
 ]
 
 if CLEAN:
-	frappe.db.delete("UA Legal Parameter", {"code": ["in", [p[0] for p in PARAMETERS]]})
-	frappe.db.delete("UA Holiday Rule", {"holiday_name": ["in", [h[0] for h in HOLIDAYS]]})
-	for title in ("Робочий календар 2026", "Робочий календар 2027"):
-		if frappe.db.exists("Holiday List", title):
-			frappe.delete_doc("Holiday List", title, force=True, ignore_permissions=True)
-	frappe.db.delete("UA Update Package", {"version": ["like", "2026%"]})
+	# Прибирається лише те, що демо створює: ручні записи з його кодами й назвами. Записи з
+	# пакетів, самі пакети й календарі не чіпаються — на екземплярі з робочими даними
+	# колишнє прибирання за кодом стирало параметри з пакетів, застосовані пакети й
+	# календар, за яким працюють люди (спіймано 09.10.2026). Календар перебудовується кнопкою.
+	manual = "Введено вручну"
+	frappe.db.delete("UA Legal Parameter", {"code": ["in", [p[0] for p in PARAMETERS]], "source": manual})
+	frappe.db.delete("UA Holiday Rule", {"holiday_name": ["in", [h[0] for h in HOLIDAYS]], "source": manual})
+	frappe.db.delete(
+		"UA Holiday Rule", {"holiday_name": ["in", ["Великдень (Пасха)", "Трійця"]], "source": manual}
+	)
 	frappe.db.commit()
-	print("демонстрационные данные удалены")
+	print("демонстраційні ручні записи видалено; пакети й календарі не чіпалися")
 	frappe.destroy()
 	sys.exit()
 
