@@ -91,3 +91,56 @@ def test_slot_key_is_the_place_in_the_year():
 	assert slot_key("Фіксована дата", "24", "8") == "24.08"
 	assert slot_key("Великдень", None, None, "0") == "Великдень"
 	assert slot_key("Трійця", None, None, 1) == "Трійця +1"
+
+
+# Норма часу з передсвятковими днями (ч. 1 ст. 53 КЗпП) — звірка з розрахунком Мінекономіки
+# на 2021 рік (останній повний рік без воєнного стану): 40 год — 1994, 39 — 1950,
+# 38,5 — 1925, 36 — 1800, 33 — 1650.
+
+from ua_compliance.calendar.rules import norm_by_month, pre_holiday_days  # noqa: E402
+
+FULL_2021 = [
+	(date(2021, 1, 1), "Новий рік", True),
+	(date(2021, 1, 7), "Різдво Христове", True),
+	(date(2021, 3, 8), "Міжнародний жіночий день", True),
+	(date(2021, 5, 1), "День праці", True),
+	(date(2021, 5, 2), "Пасха (Великдень)", True),
+	(date(2021, 5, 9), "День перемоги", True),
+	(date(2021, 6, 20), "Трійця", True),
+	(date(2021, 6, 28), "День Конституції України", True),
+	(date(2021, 8, 24), "День незалежності України", True),
+	(date(2021, 10, 14), "День захисників і захисниць України", True),
+	(date(2021, 12, 25), "Різдво Христове", True),
+]
+NEW_YEAR_2022 = [(date(2022, 1, 1), "Новий рік", True)]
+
+
+def _norm_2021(hours_per_day, martial=lambda day: False):
+	off_days = {day for day, _kind, _names in compose_days_off(2021, FULL_2021, martial)}
+	eves = pre_holiday_days(2021, FULL_2021 + NEW_YEAR_2022, off_days, martial)
+	return eves, norm_by_month(2021, off_days, eves, hours_per_day)
+
+
+def test_pre_holiday_days_2021():
+	eves, _months = _norm_2021(8)
+	# 31 грудня — напередодні Нового року наступного року; перед перенесеним вихідним — ні
+	assert eves == [
+		date(2021, 1, 6),
+		date(2021, 4, 30),
+		date(2021, 8, 23),
+		date(2021, 10, 13),
+		date(2021, 12, 24),
+		date(2021, 12, 31),
+	]
+
+
+@pytest.mark.parametrize("hours_per_day,expected", [(8, 1994), (7.8, 1950), (7.7, 1925), (7.2, 1800), (6.6, 1650)])
+def test_norm_2021_matches_ministry(hours_per_day, expected):
+	_eves, months = _norm_2021(hours_per_day)
+	assert sum(m["working_days"] for m in months) == 250
+	assert round(sum(m["hours"] for m in months), 2) == expected
+
+
+def test_martial_law_cancels_pre_holiday_shortening():
+	eves, months = _norm_2021(8, martial=lambda day: True)
+	assert eves == [] and sum(m["pre_holiday_days"] for m in months) == 0

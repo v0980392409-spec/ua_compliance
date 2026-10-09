@@ -64,3 +64,59 @@ def compose_days_off(year, holidays, martial_law_on):
 			result.append((current, "transfer", transfers[current]))
 		current += timedelta(days=1)
 	return result
+
+
+# 40 годин на п'ятиденному тижні — нормальна тривалість (ст. 50 КЗпП)
+NORMAL_HOURS_PER_DAY = 8
+
+
+def pre_holiday_days(year, holidays, off_days, martial_law_on):
+	"""Дати року, коли робочий день на годину коротший (ч. 1 ст. 53 КЗпП).
+
+	Це робочий день, наступний за яким — святковий або неробочий день (ст. 73). Перед
+	перенесеним вихідним скорочення немає: він не свято. Поки діє воєнний стан, ст. 53
+	не застосовується (ч. 6 ст. 6 Закону 2136-IX). holidays — правила цього року й
+	1 січня наступного: напередодні Нового року — 31 грудня.
+	"""
+	result = set()
+	for occurrence, _name, is_day_off in holidays:
+		if not is_day_off:
+			continue
+		eve = occurrence - timedelta(days=1)
+		if eve.year != year or eve in off_days or eve.weekday() in WEEKEND_WEEKDAYS:
+			continue
+		if martial_law_on(eve):
+			continue
+		result.add(eve)
+	return sorted(result)
+
+
+def norm_by_month(year, off_days, eves, hours_per_day):
+	"""Норма робочого часу помісячно: робочі дні, передсвяткові дні, години.
+
+	Скорочення на годину — лише за нормальної тривалості (8 годин на день). За скороченої
+	тривалості передсвятковий день не скорочується (ч. 1 ст. 53 КЗпП, «крім працівників,
+	зазначених у статті 51»): так рахує й Мінекономіки — на 2021 рік 1994 години за
+	40-годинного тижня, але рівно 250 × 7,2 = 1800 за 36-годинного.
+	"""
+	shorten = float(hours_per_day) >= NORMAL_HOURS_PER_DAY
+	eves = set(eves)
+	months = []
+	for month in range(1, 13):
+		days = short = 0
+		current = date(year, month, 1)
+		while current.month == month:
+			if current not in off_days:
+				days += 1
+				if shorten and current in eves:
+					short += 1
+			current += timedelta(days=1)
+		months.append(
+			{
+				"month": month,
+				"working_days": days,
+				"pre_holiday_days": short,
+				"hours": round(days * float(hours_per_day) - short, 2),
+			}
+		)
+	return months

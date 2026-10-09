@@ -1157,6 +1157,33 @@ chk(
 	str(built_war_transfer),
 )
 
+# Передсвятковий день (ч. 1 ст. 53 КЗпП): 12.11.2027, п'ятниця, — напередодні свята 13.11
+# (субота: у календарі це просто вихідний, тож «чи свято завтра» береться з правил)
+norm_peace = calendar_build.working_time(2027, title=TITLE_TRANSFER, martial_law_code=MARTIAL_CODE)
+chk(
+	"передсвятковий робочий день на годину коротший (ч. 1 ст. 53 КЗпП)",
+	date(2027, 11, 12) in norm_peace["pre_holiday_dates"]
+	and norm_peace["pre_holiday_days"] >= 1
+	and norm_peace["hours"] == norm_peace["working_days"] * 8 - norm_peace["pre_holiday_days"],
+	f"робочих {norm_peace['working_days']}, передсвяткових {norm_peace['pre_holiday_days']}, годин {norm_peace['hours']}",
+)
+norm_short = calendar_build.working_time(
+	2027, hours_per_day=7.2, title=TITLE_TRANSFER, martial_law_code=MARTIAL_CODE
+)
+chk(
+	"за скороченої тривалості передсвяткового скорочення немає (36 год — рівно дні × 7,2)",
+	norm_short["pre_holiday_days"] == 0 and norm_short["hours"] == round(norm_short["working_days"] * 7.2, 2),
+	f"годин {norm_short['hours']}",
+)
+norm_war = calendar_build.working_time(
+	2024, title="Перевірка перенесення 2024", martial_law_code=MARTIAL_CODE
+)
+chk(
+	"у воєнний стан передсвяткового скорочення немає (ч. 6 ст. 6 Закону 2136-IX)",
+	norm_war["pre_holiday_days"] == 0 and not norm_war["pre_holiday_dates"],
+	str(norm_war["pre_holiday_dates"]),
+)
+
 # 11. Звіт норми часу
 from frappe.desk.query_report import run as run_report
 
@@ -1175,6 +1202,10 @@ chk(
 	"звіт норми часу рахує за календарем",
 	len(month_rows) == 12 and report_days == norm["working_days"],
 	f"місяців {len(month_rows)}, робочих днів {report_days}",
+)
+chk(
+	"звіт норми часу показує передсвяткові дні окремою колонкою",
+	"pre_holiday_days" in [c.get("fieldname") if isinstance(c, dict) else c for c in report["columns"]],
 )
 
 # 12. Класифікатори (US5)

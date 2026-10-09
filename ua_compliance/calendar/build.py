@@ -14,7 +14,7 @@ from frappe.utils import getdate, today
 
 from ua_compliance.api import get_parameter
 from ua_compliance.calendar.easter import TRINITY_OFFSET, orthodox_easter
-from ua_compliance.calendar.rules import compose_days_off
+from ua_compliance.calendar.rules import compose_days_off, norm_by_month, pre_holiday_days
 
 MARTIAL_LAW_CODE = "MARTIAL_LAW"
 
@@ -159,8 +159,14 @@ def build_next_year():
 		journal.write("Перебудова календаря", "Помилка", str(error))
 
 
-def working_time(year: int, hours_per_day=8.0, title=None):
-	"""Норма часу **рахується** за календарем, а не зберігається окремим числом."""
+def working_time(year: int, hours_per_day=8.0, title=None, martial_law_code=MARTIAL_LAW_CODE):
+	"""Норма часу **рахується** за календарем, а не зберігається окремим числом (FR-044).
+
+	Робочі дні — ті, яких немає в календарі вихідних. Передсвятковий день на годину
+	коротший (ч. 1 ст. 53 КЗпП): чи наступний день святковий, видно з правил свят, а не з
+	календаря — свято на суботу календар показує просто вихідним, а п'ятниця перед ним
+	однаково скорочена. Поки діє воєнний стан, ст. 53 не застосовується.
+	"""
 	title = title or _("Робочий календар {0}").format(year)
 	if not frappe.db.exists("Holiday List", title):
 		frappe.throw(_("Календар {0} не побудовано").format(title))
@@ -171,19 +177,16 @@ def working_time(year: int, hours_per_day=8.0, title=None):
 			"Holiday", filters={"parent": title}, fields=["holiday_date"], limit=400
 		)
 	}
-
-	months = []
-	for month in range(1, 13):
-		days = 0
-		current = date(year, month, 1)
-		while current.month == month:
-			if current not in off_days:
-				days += 1
-			current += timedelta(days=1)
-		months.append({"month": month, "working_days": days, "hours": round(days * hours_per_day, 2)})
-
+	# Напередодні Нового року — 31 грудня цього року, тож потрібні й правила наступного.
+	holidays = holidays_for_year(year) + holidays_for_year(year + 1)
+	eves = pre_holiday_days(
+		year, holidays, off_days, lambda day: martial_law_active(day, martial_law_code)
+	)
+	months = norm_by_month(year, off_days, eves, hours_per_day)
 	return {
 		"months": months,
 		"working_days": sum(m["working_days"] for m in months),
+		"pre_holiday_days": sum(m["pre_holiday_days"] for m in months),
+		"pre_holiday_dates": [day for day in eves if day not in off_days],
 		"hours": round(sum(m["hours"] for m in months), 2),
 	}
